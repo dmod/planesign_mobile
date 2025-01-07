@@ -16,7 +16,10 @@ class DeviceScreen extends StatefulWidget {
 }
 
 class _DeviceScreenState extends State<DeviceScreen> {
-  static const String TEMP_CHARACTERISTIC_UUID = '2a1c';
+  static const String TEMP_CHARACTERISTIC_UUID =
+      'abbd155c-e9d1-4d9d-ae9e-6871b20880e4';
+  static const String HOSTNAME_CHARACTERISTIC_UUID =
+      '7e60d076-d3fd-496c-8460-63a0454d94d9';
 
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected;
@@ -189,6 +192,31 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
+  Widget buildHostnameDisplay() {
+    String hostname =
+        _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.computer, size: 40, color: Colors.green),
+            SizedBox(width: 16),
+            Text(
+              hostname,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -204,8 +232,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            if (_connectionState == BluetoothConnectionState.connected)
+            if (_connectionState == BluetoothConnectionState.connected) ...[
               buildTemperatureDisplay(),
+              buildHostnameDisplay(),
+            ],
             if (_isDiscoveringServices)
               const Center(
                 child: Padding(

@@ -127,7 +127,8 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  static const String TARGET_DEVICE_NAME = 'rpi-planesign-gatt-server';
+  static const String TARGET_SERVICE_UUID =
+      '3d951a35-76c5-4207-a150-2d0cf7d2bfdd';
 
   List<BluetoothDevice> _systemDevices = [];
   List<ScanResult> _scanResults = [];
@@ -140,7 +141,16 @@ class _ScanScreenState extends State<ScanScreen> {
     super.initState();
 
     _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
-      // Results will be handled in onScanPressed with delay
+      // Filter results to only show devices advertising our target service UUID
+      _scanResults = results
+          .where((r) => r.advertisementData.serviceUuids
+              .map((e) => e.str.toLowerCase())
+              .contains(TARGET_SERVICE_UUID.toLowerCase()))
+          .toList();
+
+      if (mounted) {
+        setState(() {});
+      }
     }, onError: (e) {
       Snackbar.show(ABC.b, prettyException("Scan Error:", e), success: false);
     });
@@ -172,9 +182,9 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Future onScanPressed() async {
     try {
-      // Filter system devices for our target device
+      // Filter system devices for our target service UUID
       _systemDevices = (await FlutterBluePlus.systemDevices([]))
-          .where((d) => d.platformName == TARGET_DEVICE_NAME)
+          .where((d) => d.platformName.isNotEmpty)
           .toList();
     } catch (e) {
       Snackbar.show(ABC.b, prettyException("System Devices Error:", e),
@@ -182,24 +192,24 @@ class _ScanScreenState extends State<ScanScreen> {
       print(e);
     }
     try {
-      // Start the scan but don't show results immediately
-      _scanResults = []; // Clear existing results
-      setState(() {}); // Update UI to show empty state with scanning animation
+      // Clear results and show scanning animation
+      _scanResults = [];
+      setState(() {});
 
       await FlutterBluePlus.startScan(
-          timeout: const Duration(seconds: 15), androidUsesFineLocation: false);
+          withServices: [Guid(TARGET_SERVICE_UUID)],
+          timeout: const Duration(seconds: 15),
+          androidUsesFineLocation: false);
 
-      // Listen to scan results with artificial delay
+      // Add artificial delay before showing results
       FlutterBluePlus.scanResults.listen((results) async {
-        // Add artificial delay before showing results
         await Future.delayed(const Duration(seconds: 3));
-
         if (mounted) {
           setState(() {
             _scanResults = results
-                .where((r) =>
-                    r.device.platformName == TARGET_DEVICE_NAME ||
-                    r.advertisementData.advName == TARGET_DEVICE_NAME)
+                .where((r) => r.advertisementData.serviceUuids
+                    .map((e) => e.str.toLowerCase())
+                    .contains(TARGET_SERVICE_UUID.toLowerCase()))
                 .toList();
           });
         }
@@ -306,7 +316,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     Container(
                       padding: EdgeInsets.all(20),
                       child: Text(
-                        'Scanning for $TARGET_DEVICE_NAME...\n\nMake sure the device is powered on and within range.',
+                        'Scanning for $TARGET_SERVICE_UUID...\n\nMake sure the device is powered on and within range.',
                         style: Theme.of(context).textTheme.bodyLarge,
                         textAlign: TextAlign.center,
                       ),
