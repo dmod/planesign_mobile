@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -20,6 +21,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       'abbd155c-e9d1-4d9d-ae9e-6871b20880e4';
   static const String HOSTNAME_CHARACTERISTIC_UUID =
       '7e60d076-d3fd-496c-8460-63a0454d94d9';
+  static const String REBOOT_CHARACTERISTIC_UUID =
+      '99945678-1234-5678-1234-56789abcdef2';
 
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected;
@@ -171,7 +174,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     String tempValue =
         _characteristicValues[TEMP_CHARACTERISTIC_UUID] ?? 'No reading';
     return Card(
-      margin: EdgeInsets.all(16),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Row(
@@ -196,7 +199,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     String hostname =
         _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
     return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16),
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Row(
@@ -212,6 +215,54 @@ class _DeviceScreenState extends State<DeviceScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _rebootDevice() async {
+    try {
+      for (var service in _services) {
+        for (var characteristic in service.characteristics) {
+          if (characteristic.uuid.str.toLowerCase() ==
+              REBOOT_CHARACTERISTIC_UUID.toLowerCase()) {
+            await characteristic.write(utf8.encode('reboot'));
+            Snackbar.show(ABC.c, "Reboot command sent", success: true);
+            return;
+          }
+        }
+      }
+      Snackbar.show(ABC.c, "Reboot characteristic not found", success: false);
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException("Reboot Error:", e), success: false);
+    }
+  }
+
+  Widget buildRebootButton() {
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.red[100],
+      child: InkWell(
+        onTap: _connectionState == BluetoothConnectionState.connected
+            ? _rebootDevice
+            : null,
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.restart_alt, size: 40, color: Colors.red),
+              SizedBox(width: 16),
+              Text(
+                'Reboot Device',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -235,6 +286,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
             if (_connectionState == BluetoothConnectionState.connected) ...[
               buildTemperatureDisplay(),
               buildHostnameDisplay(),
+              buildRebootButton(),
             ],
             if (_isDiscoveringServices)
               const Center(
