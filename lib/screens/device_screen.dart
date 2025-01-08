@@ -23,6 +23,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       '7e60d076-d3fd-496c-8460-63a0454d94d9';
   static const String REBOOT_CHARACTERISTIC_UUID =
       '99945678-1234-5678-1234-56789abcdef2';
+  static const String VERSION_CHARACTERISTIC_UUID =
+      '2d037cd2-c565-4d61-af60-be26ffb7209c';
 
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected;
@@ -196,6 +198,31 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildHostnameDisplay() {
+    String hostname =
+        _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.computer, size: 40, color: Colors.green),
+            SizedBox(width: 16),
+            Text(
+              hostname,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildVersionDisplay() {
     String hostname =
         _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
     return Card(
