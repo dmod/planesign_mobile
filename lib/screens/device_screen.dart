@@ -150,7 +150,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         ),
         ...service.characteristics
             .map((c) => buildCharacteristicTile(c))
-            .toList(),
+            ,
         Divider(),
       ],
     );
@@ -322,7 +322,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   child: CircularProgressIndicator(),
                 ),
               ),
-            ..._services.map(buildServiceTile).toList(),
+            ..._services.map(buildServiceTile),
           ],
         ),
       ),

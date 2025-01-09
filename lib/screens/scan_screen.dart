@@ -38,7 +38,7 @@ class _RadarScanAnimationState extends State<RadarScanAnimation>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: 200,
       height: 200,
       child: Stack(
