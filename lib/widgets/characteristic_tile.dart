@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -13,8 +12,7 @@ class CharacteristicTile extends StatefulWidget {
   final BluetoothCharacteristic characteristic;
   final List<DescriptorTile> descriptorTiles;
 
-  const CharacteristicTile(
-      {super.key, required this.characteristic, required this.descriptorTiles});
+  const CharacteristicTile({super.key, required this.characteristic, required this.descriptorTiles});
 
   @override
   State<CharacteristicTile> createState() => _CharacteristicTileState();
@@ -28,8 +26,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
   @override
   void initState() {
     super.initState();
-    _lastValueSubscription =
-        widget.characteristic.lastValueStream.listen((value) {
+    _lastValueSubscription = widget.characteristic.lastValueStream.listen((value) {
       _value = value;
       if (mounted) {
         setState(() {});
@@ -45,16 +42,6 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
 
   BluetoothCharacteristic get c => widget.characteristic;
 
-  List<int> _getRandomBytes() {
-    final math = Random();
-    return [
-      math.nextInt(255),
-      math.nextInt(255),
-      math.nextInt(255),
-      math.nextInt(255)
-    ];
-  }
-
   Future onReadPressed() async {
     try {
       await c.read();
@@ -67,8 +54,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
   Future onWritePressed() async {
     try {
       List<int> testMessage = utf8.encode('Test ${DateTime.now().second}');
-      await c.write(testMessage,
-          withoutResponse: c.properties.writeWithoutResponse);
+      await c.write(testMessage, withoutResponse: c.properties.writeWithoutResponse);
       Snackbar.show(ABC.c, "Write: Success", success: true);
       if (c.properties.read) {
         await c.read();
@@ -90,8 +76,7 @@ class _CharacteristicTileState extends State<CharacteristicTile> {
         setState(() {});
       }
     } catch (e) {
-      Snackbar.show(ABC.c, prettyException("Subscribe Error:", e),
-          success: false);
+      Snackbar.show(ABC.c, prettyException("Subscribe Error:", e), success: false);
     }
   }
 
