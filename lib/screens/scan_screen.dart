@@ -17,8 +17,7 @@ class RadarScanAnimation extends StatefulWidget {
   State<RadarScanAnimation> createState() => _RadarScanAnimationState();
 }
 
-class _RadarScanAnimationState extends State<RadarScanAnimation>
-    with SingleTickerProviderStateMixin {
+class _RadarScanAnimationState extends State<RadarScanAnimation> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
@@ -127,8 +126,7 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  static const String TARGET_SERVICE_UUID =
-      '3d951a35-76c5-4207-a150-2d0cf7d2bfdd';
+  static const String TARGET_SERVICE_UUID = '3d951a35-76c5-4207-a150-2d0cf7d2bfdd';
 
   List<BluetoothDevice> _systemDevices = [];
   List<ScanResult> _scanResults = [];
@@ -183,12 +181,9 @@ class _ScanScreenState extends State<ScanScreen> {
   Future onScanPressed() async {
     try {
       // Filter system devices for our target service UUID
-      _systemDevices = (await FlutterBluePlus.systemDevices([]))
-          .where((d) => d.platformName.isNotEmpty)
-          .toList();
+      _systemDevices = (await FlutterBluePlus.systemDevices([])).where((d) => d.platformName.isNotEmpty).toList();
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("System Devices Error:", e),
-          success: false);
+      Snackbar.show(ABC.b, prettyException("System Devices Error:", e), success: false);
       print(e);
     }
     try {
@@ -215,8 +210,7 @@ class _ScanScreenState extends State<ScanScreen> {
         }
       });
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("Start Scan Error:", e),
-          success: false);
+      Snackbar.show(ABC.b, prettyException("Start Scan Error:", e), success: false);
       print(e);
     }
     if (mounted) {
@@ -228,20 +222,17 @@ class _ScanScreenState extends State<ScanScreen> {
     try {
       FlutterBluePlus.stopScan();
     } catch (e) {
-      Snackbar.show(ABC.b, prettyException("Stop Scan Error:", e),
-          success: false);
+      Snackbar.show(ABC.b, prettyException("Stop Scan Error:", e), success: false);
       print(e);
     }
   }
 
   void onConnectPressed(BluetoothDevice device) {
     device.connectAndUpdateStream().catchError((e) {
-      Snackbar.show(ABC.c, prettyException("Connect Error:", e),
-          success: false);
+      Snackbar.show(ABC.c, prettyException("Connect Error:", e), success: false);
     });
     MaterialPageRoute route = MaterialPageRoute(
-        builder: (context) => DeviceScreen(device: device),
-        settings: RouteSettings(name: '/DeviceScreen'));
+        builder: (context) => DeviceScreen(device: device), settings: RouteSettings(name: '/DeviceScreen'));
     Navigator.of(context).push(route);
   }
 

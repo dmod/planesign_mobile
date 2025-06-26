@@ -26,8 +26,7 @@ class _FlutterBlueAppState extends State<FlutterBlueApp> {
   @override
   void initState() {
     super.initState();
-    _adapterStateStateSubscription =
-        FlutterBluePlus.adapterState.listen((state) {
+    _adapterStateStateSubscription = FlutterBluePlus.adapterState.listen((state) {
       _adapterState = state;
       if (mounted) {
         setState(() {});
@@ -64,8 +63,7 @@ class BluetoothAdapterStateObserver extends NavigatorObserver {
     super.didPush(route, previousRoute);
     if (route.settings.name == '/DeviceScreen') {
       // Start listening to Bluetooth state changes when a new route is pushed
-      _adapterStateSubscription ??=
-          FlutterBluePlus.adapterState.listen((state) {
+      _adapterStateSubscription ??= FlutterBluePlus.adapterState.listen((state) {
         if (state != BluetoothAdapterState.on) {
           // Pop the current route if Bluetooth is off
           navigator?.pop();
