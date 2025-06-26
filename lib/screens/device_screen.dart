@@ -23,8 +23,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       '7e60d076-d3fd-496c-8460-63a0454d94d9';
   static const String REBOOT_CHARACTERISTIC_UUID =
       '99945678-1234-5678-1234-56789abcdef2';
-  static const String VERSION_CHARACTERISTIC_UUID =
-      '2d037cd2-c565-4d61-af60-be26ffb7209c';
+  static const String UPTIME_CHARACTERISTIC_UUID =
+      'a77a6077-7302-486e-9087-853ac5899335';
 
   BluetoothConnectionState _connectionState =
       BluetoothConnectionState.disconnected;
@@ -32,6 +32,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
   bool _isDiscoveringServices = false;
   bool _isConnecting = false;
   Map<String, String> _characteristicValues = {};
+
+  // Connection stability variables
+  bool _autoReconnect = true;
+  int _reconnectAttempts = 0;
+  static const int _maxReconnectAttempts = 5;
+  Timer? _reconnectTimer;
 
   late StreamSubscription<BluetoothConnectionState>
       _connectionStateSubscription;
@@ -45,6 +51,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
         widget.device.connectionState.listen((state) async {
       _connectionState = state;
       if (state == BluetoothConnectionState.connected) {
+        // Reset reconnection attempts on successful connection
+        _reconnectAttempts = 0;
+        _reconnectTimer?.cancel();
+
         _services = []; // must rediscover services
         if (mounted) {
           setState(() {
@@ -88,6 +98,15 @@ class _DeviceScreenState extends State<DeviceScreen> {
             _isDiscoveringServices = false;
           });
         }
+      } else if (state == BluetoothConnectionState.disconnected) {
+        // Handle disconnection
+        if (_autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
+          _scheduleReconnect();
+        } else if (_reconnectAttempts >= _maxReconnectAttempts) {
+          Snackbar.show(ABC.c,
+              "Max reconnection attempts (${_maxReconnectAttempts}) reached. Please manually reconnect.",
+              success: false);
+        }
       }
       if (mounted) {
         setState(() {});
@@ -117,16 +136,57 @@ class _DeviceScreenState extends State<DeviceScreen> {
     }
   }
 
+  void _scheduleReconnect() {
+    _reconnectTimer?.cancel();
+    final delay =
+        Duration(seconds: 2 * (_reconnectAttempts + 1)); // Exponential backoff
+
+    _reconnectTimer = Timer(delay, () async {
+      if (!mounted) return;
+
+      _reconnectAttempts++;
+      print(
+          'Reconnection attempt $_reconnectAttempts of $_maxReconnectAttempts');
+
+      if (mounted) {
+        Snackbar.show(ABC.c,
+            "Reconnecting... (attempt $_reconnectAttempts/$_maxReconnectAttempts)",
+            success: true);
+      }
+
+      try {
+        await onConnectPressed();
+      } catch (e) {
+        print('Reconnection attempt failed: $e');
+        if (_reconnectAttempts < _maxReconnectAttempts) {
+          _scheduleReconnect();
+        }
+      }
+    });
+  }
+
   @override
   void dispose() {
     _connectionStateSubscription.cancel();
     _isConnectingSubscription.cancel();
+    _reconnectTimer?.cancel();
     super.dispose();
   }
 
   Future onConnectPressed() async {
     try {
+      // Cancel any pending reconnection attempts
+      _reconnectTimer?.cancel();
+
       await widget.device.connectAndUpdateStream();
+
+      // Request higher MTU for better data throughput (if supported)
+      try {
+        await widget.device.requestMtu(512);
+      } catch (e) {
+        // MTU request might not be supported on all platforms
+        print('MTU request failed: $e');
+      }
     } catch (e) {
       if (e is! FlutterBluePlusException ||
           e.code != FbpErrorCode.connectionCanceled.index) {
@@ -134,26 +194,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
             success: false);
       }
     }
-  }
-
-  Widget buildServiceTile(BluetoothService service) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: EdgeInsets.all(16),
-          color: Colors.grey[200],
-          child: Text(
-            'Service: 0x${service.uuid.str.toUpperCase()}',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        ...service.characteristics
-            .map((c) => buildCharacteristicTile(c))
-            ,
-        Divider(),
-      ],
-    );
   }
 
   Widget buildCharacteristicTile(BluetoothCharacteristic c) {
@@ -198,31 +238,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildHostnameDisplay() {
-    String hostname =
-        _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
-    return Card(
-      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.computer, size: 40, color: Colors.green),
-            SizedBox(width: 16),
-            Text(
-              hostname,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget buildVersionDisplay() {
     String hostname =
         _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
     return Card(
@@ -295,6 +310,70 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
+  String _extractUptimeFromOutput(String uptimeOutput) {
+    // Simple extraction: just get the part between "up " and " user" or " load"
+    // Example: "22:52:22 up  2:17,  1 user,  load average: 0.02, 0.05, 0.18"
+    // Returns: "2:17"
+
+    try {
+      if (uptimeOutput.trim().isEmpty || uptimeOutput == 'No value') {
+        return 'Unknown';
+      }
+
+      final upIndex = uptimeOutput.indexOf('up ');
+      if (upIndex == -1) return uptimeOutput.trim();
+
+      final startIndex = upIndex + 3; // Skip "up "
+
+      // Find where uptime info ends (before user count or load average)
+      final userIndex = uptimeOutput.indexOf(' user', startIndex);
+      final loadIndex = uptimeOutput.indexOf(' load', startIndex);
+
+      int endIndex = uptimeOutput.length;
+      if (userIndex != -1) endIndex = userIndex;
+      if (loadIndex != -1 && loadIndex < endIndex) endIndex = loadIndex;
+
+      String result = uptimeOutput.substring(startIndex, endIndex).trim();
+      
+      // Remove trailing comma and any extra whitespace/numbers after comma
+      // This handles cases like "2:17,  1" -> "2:17"
+      final commaIndex = result.indexOf(',');
+      if (commaIndex != -1) {
+        result = result.substring(0, commaIndex).trim();
+      }
+      
+      return result;
+    } catch (e) {
+      return uptimeOutput.trim();
+    }
+  }
+
+  Widget buildUptimeDisplay() {
+    String uptimeRaw = _characteristicValues[UPTIME_CHARACTERISTIC_UUID] ?? 'No reading';
+    String uptimeDisplay = _extractUptimeFromOutput(uptimeRaw);
+    
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.access_time, size: 40, color: Colors.purple),
+            SizedBox(width: 16),
+            Text(
+              uptimeDisplay,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -309,20 +388,61 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 'Status: ${_connectionState.toString().split('.')[1]}',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
+              subtitle: _reconnectAttempts > 0
+                  ? Text(
+                      'Reconnection attempts: $_reconnectAttempts/$_maxReconnectAttempts')
+                  : null,
             ),
+            // Auto-reconnect toggle
+            SwitchListTile(
+              title: Text('Auto Reconnect'),
+              subtitle: Text('Automatically reconnect when connection is lost'),
+              value: _autoReconnect,
+              onChanged: (value) {
+                setState(() {
+                  _autoReconnect = value;
+                  if (!value) {
+                    _reconnectTimer?.cancel();
+                  }
+                });
+              },
+            ),
+            // Manual reconnect button
+            if (_connectionState == BluetoothConnectionState.disconnected)
+              Card(
+                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: InkWell(
+                  onTap: () {
+                    _reconnectAttempts =
+                        0; // Reset counter for manual reconnect
+                    onConnectPressed();
+                  },
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.refresh, size: 40, color: Colors.blue),
+                        SizedBox(width: 16),
+                        Text(
+                          'Reconnect',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             if (_connectionState == BluetoothConnectionState.connected) ...[
               buildTemperatureDisplay(),
               buildHostnameDisplay(),
+              buildUptimeDisplay(),
               buildRebootButton(),
             ],
-            if (_isDiscoveringServices)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20.0),
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            ..._services.map(buildServiceTile),
           ],
         ),
       ),
