@@ -3,6 +3,8 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+// Requires url_launcher dependency (added in pubspec)
+import 'package:url_launcher/url_launcher.dart';
 
 import '../utils/snackbar.dart';
 import '../utils/extra.dart';
@@ -36,6 +38,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
 
+  // Key for programmatic control of refresh indicator (optional future use)
+  final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
+
   @override
   void initState() {
     super.initState();
@@ -56,7 +61,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               if (characteristic.properties.read) {
                 try {
                   final value = await characteristic.read();
-                  _updateCharacteristicValue(characteristic.uuid.str, value);
+                  _updateCharacteristicValue(characteristic.uuid.str128, value);
                 } catch (e) {
                   print('Error reading characteristic ${characteristic.uuid}: $e');
                 }
@@ -101,13 +106,18 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   void _updateCharacteristicValue(String uuid, List<int> value) {
+    final key = uuid.toLowerCase();
+
+    String decoded = utf8.decode(value, allowMalformed: true);
+
+    // Remove any trailing NULLs and trim whitespace
+    decoded = decoded.replaceAll('\x00', '').trim();
+
+    debugPrint('[BLE] Update $key (${value.length} bytes) raw=$value utf8="$decoded"');
+
     if (mounted) {
       setState(() {
-        try {
-          _characteristicValues[uuid] = String.fromCharCodes(value);
-        } catch (e) {
-          _characteristicValues[uuid] = value.toString();
-        }
+        _characteristicValues[key] = decoded;
       });
     }
   }
@@ -163,6 +173,40 @@ class _DeviceScreenState extends State<DeviceScreen> {
       if (e is! FlutterBluePlusException || e.code != FbpErrorCode.connectionCanceled.index) {
         Snackbar.show(ABC.c, prettyException("Connect Error:", e), success: false);
       }
+    }
+  }
+
+  // Unified pull-to-refresh handler: force a clean reconnect & resubscribe
+  Future<void> _handlePullToRefresh() async {
+    try {
+      Snackbar.show(ABC.c, "Refreshing connection...", success: true);
+
+      // Clear in-memory caches immediately for visual feedback
+      setState(() {
+        _services = [];
+        _characteristicValues.clear();
+        _reconnectAttempts = 0; // treat as fresh session
+      });
+
+      // If currently connected (or connecting), attempt a graceful disconnect first
+      BluetoothConnectionState currentState = _connectionState;
+      if (currentState == BluetoothConnectionState.connected || currentState == BluetoothConnectionState.connecting) {
+        try {
+          await widget.device.disconnect(queue: false);
+        } catch (_) {
+          // Ignore disconnect errors
+        }
+      }
+
+      // Give the stack a brief pause to settle before reconnect
+      await Future.delayed(const Duration(milliseconds: 250));
+
+      await onConnectPressed();
+
+      // Allow listener (discoverServices, subscriptions) to complete
+      await Future.delayed(const Duration(milliseconds: 500));
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException("Refresh Error:", e), success: false);
     }
   }
 
@@ -246,6 +290,62 @@ class _DeviceScreenState extends State<DeviceScreen> {
     }
   }
 
+  Future<void> _openHostInBrowser() async {
+    final raw = _characteristicValues[hostnameCharUUID];
+    if (raw == null || raw.trim().isEmpty) {
+      Snackbar.show(ABC.c, "Hostname not available", success: false);
+      return;
+    }
+    final host = raw.trim();
+    final uri = Uri.tryParse('https://$host');
+    if (uri == null) {
+      Snackbar.show(ABC.c, "Malformed URL", success: false);
+      return;
+    }
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok) {
+        Snackbar.show(ABC.c, "Could not launch browser", success: false);
+      }
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException("Launch Error:", e), success: false);
+    }
+  }
+
+  Widget buildOpenBrowserCard() {
+    final raw = _characteristicValues[hostnameCharUUID];
+    final hasHost = raw != null && raw.trim().isNotEmpty;
+    final displayHost = hasHost ? raw.trim() : '';
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: hasHost ? Colors.indigo[50] : Colors.grey[200],
+      child: InkWell(
+        onTap: hasHost ? _openHostInBrowser : null,
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.open_in_browser, size: 40, color: hasHost ? Colors.indigo : Colors.grey),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  hasHost ? 'Open https://$displayHost' : 'Hostname unavailable',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: hasHost ? Colors.indigo : Colors.grey,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget buildRebootButton() {
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -306,68 +406,84 @@ class _DeviceScreenState extends State<DeviceScreen> {
       appBar: AppBar(
         title: Text(widget.device.platformName),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: <Widget>[
-            ListTile(
-              title: Text(
-                'Status: ${_connectionState.toString().split('.')[1]}',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              subtitle: _reconnectAttempts > 0
-                  ? Text('Reconnection attempts: $_reconnectAttempts/$_maxReconnectAttempts')
-                  : null,
-            ),
-            // Auto-reconnect toggle
-            SwitchListTile(
-              title: Text('Auto Reconnect'),
-              subtitle: Text('Automatically reconnect when connection is lost'),
-              value: _autoReconnect,
-              onChanged: (value) {
-                setState(() {
-                  _autoReconnect = value;
-                  if (!value) {
-                    _reconnectTimer?.cancel();
-                  }
-                });
-              },
-            ),
-            // Manual reconnect button
-            if (_connectionState == BluetoothConnectionState.disconnected)
-              Card(
-                margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: InkWell(
-                  onTap: () {
-                    _reconnectAttempts = 0; // Reset counter for manual reconnect
-                    onConnectPressed();
+      body: RefreshIndicator(
+        key: _refreshKey,
+        color: Theme.of(context).colorScheme.primary,
+        onRefresh: _handlePullToRefresh,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: <Widget>[
+              ListTile(
+                title: Text(
+                  'Status: ${_connectionState.toString().split('.')[1]}',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: _reconnectAttempts > 0
+                    ? Text('Reconnection attempts: $_reconnectAttempts/$_maxReconnectAttempts')
+                    : null,
+                trailing: IconButton(
+                  tooltip: 'Refresh / Reconnect',
+                  icon: const Icon(Icons.sync),
+                  onPressed: () {
+                    _refreshKey.currentState?.show();
+                    _handlePullToRefresh();
                   },
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.refresh, size: 40, color: Colors.blue),
-                        SizedBox(width: 16),
-                        Text(
-                          'Reconnect',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
+                ),
+              ),
+              // Auto-reconnect toggle
+              SwitchListTile(
+                title: const Text('Auto Reconnect'),
+                subtitle: const Text('Automatically reconnect when connection is lost'),
+                value: _autoReconnect,
+                onChanged: (value) {
+                  setState(() {
+                    _autoReconnect = value;
+                    if (!value) {
+                      _reconnectTimer?.cancel();
+                    }
+                  });
+                },
+              ),
+              // Manual reconnect button (also redundant with pull-to-refresh, but kept)
+              if (_connectionState == BluetoothConnectionState.disconnected)
+                Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: InkWell(
+                    onTap: () {
+                      _reconnectAttempts = 0; // Reset counter for manual reconnect
+                      onConnectPressed();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.refresh, size: 40, color: Colors.blue),
+                          SizedBox(width: 16),
+                          Text(
+                            'Reconnect',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            if (_connectionState == BluetoothConnectionState.connected) ...[
-              buildTemperatureDisplay(),
-              buildHostnameDisplay(),
-              buildUptimeDisplay(),
-              buildRebootButton(),
+              if (_connectionState == BluetoothConnectionState.connected) ...[
+                buildTemperatureDisplay(),
+                buildHostnameDisplay(),
+                buildOpenBrowserCard(),
+                buildUptimeDisplay(),
+                buildRebootButton(),
+              ],
+              const SizedBox(height: 32), // Ensure scroll area even if few widgets
             ],
-          ],
+          ),
         ),
       ),
     );
