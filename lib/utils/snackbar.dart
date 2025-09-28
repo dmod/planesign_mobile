@@ -24,7 +24,7 @@ class Snackbar {
     }
   }
 
-  static show(ABC abc, String msg, {required bool success}) {
+  static void show(ABC abc, String msg, {required bool success}) {
     final snackBar = success
         ? SnackBar(content: Text(msg), backgroundColor: Colors.blue)
         : SnackBar(content: Text(msg), backgroundColor: Colors.red);

@@ -48,7 +48,7 @@ class _RadarScanAnimationState extends State<RadarScanAnimation> with SingleTick
             height: 200,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.blue.withOpacity(0.5)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.5)),
             ),
           ),
           Container(
@@ -56,7 +56,7 @@ class _RadarScanAnimationState extends State<RadarScanAnimation> with SingleTick
             height: 150,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
             ),
           ),
           Container(
@@ -64,7 +64,7 @@ class _RadarScanAnimationState extends State<RadarScanAnimation> with SingleTick
             height: 100,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.blue.withOpacity(0.2)),
+              border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
             ),
           ),
           AnimatedBuilder(
@@ -91,8 +91,8 @@ class RadarPainter extends CustomPainter {
     final Paint paint = Paint()
       ..shader = SweepGradient(
         colors: [
-          Colors.blue.withOpacity(0),
-          Colors.blue.withOpacity(0.5),
+          Colors.blue.withValues(alpha: 0.0),
+          Colors.blue.withValues(alpha: 0.5),
         ],
         stops: const [0.0, 1.0],
         startAngle: 0,
@@ -126,7 +126,7 @@ class ScanScreen extends StatefulWidget {
 }
 
 class _ScanScreenState extends State<ScanScreen> {
-  static const String TARGET_SERVICE_UUID = '3d951a35-76c5-4207-a150-2d0cf7d2bfdd';
+  static const String planesignMasterUUID = '3d951a35-76c5-4207-a150-2d0cf7d2bfdd';
 
   List<BluetoothDevice> _systemDevices = [];
   List<ScanResult> _scanResults = [];
@@ -143,7 +143,7 @@ class _ScanScreenState extends State<ScanScreen> {
       _scanResults = results
           .where((r) => r.advertisementData.serviceUuids
               .map((e) => e.str.toLowerCase())
-              .contains(TARGET_SERVICE_UUID.toLowerCase()))
+              .contains(planesignMasterUUID.toLowerCase()))
           .toList();
 
       if (mounted) {
@@ -192,7 +192,7 @@ class _ScanScreenState extends State<ScanScreen> {
       setState(() {});
 
       await FlutterBluePlus.startScan(
-          withServices: [Guid(TARGET_SERVICE_UUID)],
+          withServices: [Guid(planesignMasterUUID)],
           timeout: const Duration(seconds: 15),
           androidUsesFineLocation: false);
 
@@ -204,7 +204,7 @@ class _ScanScreenState extends State<ScanScreen> {
             _scanResults = results
                 .where((r) => r.advertisementData.serviceUuids
                     .map((e) => e.str.toLowerCase())
-                    .contains(TARGET_SERVICE_UUID.toLowerCase()))
+                    .contains(planesignMasterUUID.toLowerCase()))
                 .toList();
           });
         }
@@ -307,7 +307,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     Container(
                       padding: EdgeInsets.all(20),
                       child: Text(
-                        'Scanning for $TARGET_SERVICE_UUID...\n\nMake sure the device is powered on and within range.',
+                        'Scanning for $planesignMasterUUID...\n\nMake sure the device is powered on and within range.',
                         style: Theme.of(context).textTheme.bodyLarge,
                         textAlign: TextAlign.center,
                       ),

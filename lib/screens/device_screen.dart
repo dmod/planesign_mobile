@@ -18,15 +18,13 @@ class DeviceScreen extends StatefulWidget {
 }
 
 class _DeviceScreenState extends State<DeviceScreen> {
-  static const String TEMP_CHARACTERISTIC_UUID = 'abbd155c-e9d1-4d9d-ae9e-6871b20880e4';
-  static const String HOSTNAME_CHARACTERISTIC_UUID = '7e60d076-d3fd-496c-8460-63a0454d94d9';
-  static const String REBOOT_CHARACTERISTIC_UUID = '99945678-1234-5678-1234-56789abcdef2';
-  static const String UPTIME_CHARACTERISTIC_UUID = 'a77a6077-7302-486e-9087-853ac5899335';
+  static const String tempCharUUID = 'abbd155c-e9d1-4d9d-ae9e-6871b20880e4';
+  static const String hostnameCharUUID = '7e60d076-d3fd-496c-8460-63a0454d94d9';
+  static const String rebootCharUUID = '99945678-1234-5678-1234-56789abcdef2';
+  static const String uptimeCharUUID = 'a77a6077-7302-486e-9087-853ac5899335';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
-  bool _isDiscoveringServices = false;
-  bool _isConnecting = false;
   Map<String, String> _characteristicValues = {};
 
   // Connection stability variables
@@ -50,11 +48,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
         _reconnectTimer?.cancel();
 
         _services = []; // must rediscover services
-        if (mounted) {
-          setState(() {
-            _isDiscoveringServices = true;
-          });
-        }
         try {
           _services = await widget.device.discoverServices();
           // Automatically read and subscribe to all characteristics
@@ -83,11 +76,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
         } catch (e) {
           Snackbar.show(ABC.c, prettyException("Discover Services Error:", e), success: false);
         }
-        if (mounted) {
-          setState(() {
-            _isDiscoveringServices = false;
-          });
-        }
       } else if (state == BluetoothConnectionState.disconnected) {
         // Handle disconnection
         if (_autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
@@ -103,7 +91,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
     });
 
     _isConnectingSubscription = widget.device.isConnecting.listen((value) {
-      _isConnecting = value;
       if (mounted) {
         setState(() {});
       }
@@ -195,7 +182,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildTemperatureDisplay() {
-    String tempValue = _characteristicValues[TEMP_CHARACTERISTIC_UUID] ?? 'No reading';
+    String tempValue = _characteristicValues[tempCharUUID] ?? 'No reading';
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
@@ -219,7 +206,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildHostnameDisplay() {
-    String hostname = _characteristicValues[HOSTNAME_CHARACTERISTIC_UUID] ?? 'Unknown';
+    String hostname = _characteristicValues[hostnameCharUUID] ?? 'Unknown';
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
@@ -246,7 +233,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     try {
       for (var service in _services) {
         for (var characteristic in service.characteristics) {
-          if (characteristic.uuid.str.toLowerCase() == REBOOT_CHARACTERISTIC_UUID.toLowerCase()) {
+          if (characteristic.uuid.str.toLowerCase() == rebootCharUUID.toLowerCase()) {
             await characteristic.write(utf8.encode('reboot'));
             Snackbar.show(ABC.c, "Reboot command sent", success: true);
             return;
@@ -288,7 +275,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildUptimeDisplay() {
-    String uptimeRaw = _characteristicValues[UPTIME_CHARACTERISTIC_UUID] ?? 'No reading';
+    String uptimeRaw = _characteristicValues[uptimeCharUUID] ?? 'No reading';
     String uptimeDisplay = extractUptimeFromOutput(uptimeRaw);
 
     return Card(
