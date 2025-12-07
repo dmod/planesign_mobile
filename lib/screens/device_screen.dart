@@ -26,6 +26,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   static const String rebootCharUUID = '99945678-1234-5678-1234-56789abcdef2';
   static const String uptimeCharUUID = 'a77a6077-7302-486e-9087-853ac5899335';
   static const String wifiStatusCharUUID = 'f2a3b4c5-6d7e-8f90-a1b2-c3d4e5f6a7b8';
+  static const String wifiScanCharUUID = '99945678-1234-5678-1234-56789abcdef3';
+  static const String wifiConfigCharUUID = '99945678-1234-5678-1234-56789abcdef4';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
@@ -546,6 +548,96 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
+  Future<List<Map<String, String>>> _scanWifiNetworks() async {
+    try {
+      for (var service in _services) {
+        for (var characteristic in service.characteristics) {
+          if (characteristic.uuid.str.toLowerCase() == wifiScanCharUUID.toLowerCase()) {
+            final value = await characteristic.read();
+            final decoded = utf8.decode(value, allowMalformed: true).trim();
+
+            // Parse format: "SSID|signal|encrypted" per line
+            final networks = <Map<String, String>>[];
+            for (var line in decoded.split('\n')) {
+              if (line.trim().isEmpty) continue;
+              final parts = line.split('|');
+              if (parts.isNotEmpty && parts[0].isNotEmpty) {
+                networks.add({
+                  'ssid': parts[0],
+                  'signal': parts.length > 1 ? parts[1] : '0',
+                  'encrypted': parts.length > 2 ? parts[2] : 'no',
+                });
+              }
+            }
+            return networks;
+          }
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error scanning WiFi: $e');
+      return [];
+    }
+  }
+
+  Future<bool> _configureWifi(String ssid, String password) async {
+    try {
+      for (var service in _services) {
+        for (var characteristic in service.characteristics) {
+          if (characteristic.uuid.str.toLowerCase() == wifiConfigCharUUID.toLowerCase()) {
+            // Format: "SSID|PASSWORD" or "SSID|" for open networks
+            final credentials = '$ssid|$password';
+            await characteristic.write(utf8.encode(credentials));
+            return true;
+          }
+        }
+      }
+      return false;
+    } catch (e) {
+      print('Error configuring WiFi: $e');
+      return false;
+    }
+  }
+
+  void _showWifiConfigDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => _WifiConfigDialog(
+        onScan: _scanWifiNetworks,
+        onConfigure: _configureWifi,
+      ),
+    );
+  }
+
+  Widget buildWifiConfigButton() {
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      color: Colors.blue[50],
+      child: InkWell(
+        onTap: _connectionState == BluetoothConnectionState.connected ? _showWifiConfigDialog : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.wifi_find, size: 40, color: Colors.blue[700]),
+              const SizedBox(width: 16),
+              Text(
+                'Configure WiFi',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -609,6 +701,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 ),
               if (_connectionState == BluetoothConnectionState.connected) ...[
                 buildWifiStatusCard(),
+                buildWifiConfigButton(),
                 buildTemperatureDisplay(),
                 buildHostnameDisplay(),
                 buildOpenBrowserCard(),
@@ -620,6 +713,249 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// WiFi Configuration Dialog Widget
+class _WifiConfigDialog extends StatefulWidget {
+  final Future<List<Map<String, String>>> Function() onScan;
+  final Future<bool> Function(String ssid, String password) onConfigure;
+
+  const _WifiConfigDialog({
+    required this.onScan,
+    required this.onConfigure,
+  });
+
+  @override
+  State<_WifiConfigDialog> createState() => _WifiConfigDialogState();
+}
+
+class _WifiConfigDialogState extends State<_WifiConfigDialog> {
+  List<Map<String, String>> _networks = [];
+  bool _isScanning = false;
+  bool _isConfiguring = false;
+  String? _selectedSsid;
+  bool _selectedIsEncrypted = true;
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _startScan();
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _startScan() async {
+    setState(() {
+      _isScanning = true;
+      _networks = [];
+    });
+
+    final networks = await widget.onScan();
+
+    if (mounted) {
+      setState(() {
+        _networks = networks;
+        _isScanning = false;
+      });
+    }
+  }
+
+  Future<void> _configure() async {
+    if (_selectedSsid == null) return;
+
+    setState(() => _isConfiguring = true);
+
+    final success = await widget.onConfigure(
+      _selectedSsid!,
+      _passwordController.text,
+    );
+
+    if (mounted) {
+      setState(() => _isConfiguring = false);
+
+      if (success) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('WiFi configured: $_selectedSsid'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to configure WiFi'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  IconData _getSignalIcon(String signalStr) {
+    final signal = int.tryParse(signalStr.replaceAll(RegExp(r'[^0-9-]'), '')) ?? -100;
+    // Signal is typically in dBm (negative) or percentage
+    if (signal > 0) {
+      // Percentage
+      if (signal >= 70) return Icons.wifi;
+      if (signal >= 40) return Icons.wifi_2_bar;
+      return Icons.wifi_1_bar;
+    } else {
+      // dBm
+      if (signal >= -50) return Icons.wifi;
+      if (signal >= -70) return Icons.wifi_2_bar;
+      return Icons.wifi_1_bar;
+    }
+  }
+
+  Color _getSignalColor(String signalStr) {
+    final signal = int.tryParse(signalStr.replaceAll(RegExp(r'[^0-9-]'), '')) ?? -100;
+    if (signal > 0) {
+      if (signal >= 70) return Colors.green;
+      if (signal >= 40) return Colors.orange;
+      return Colors.red;
+    } else {
+      if (signal >= -50) return Colors.green;
+      if (signal >= -70) return Colors.orange;
+      return Colors.red;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Row(
+        children: [
+          const Icon(Icons.wifi, color: Colors.blue),
+          const SizedBox(width: 8),
+          const Expanded(child: Text('Configure WiFi')),
+          if (_isScanning)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: _startScan,
+              tooltip: 'Rescan',
+            ),
+        ],
+      ),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_isScanning && _networks.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: Text('Scanning for networks...')),
+              )
+            else if (_networks.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: Text('No networks found')),
+              )
+            else
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _networks.length,
+                  itemBuilder: (context, index) {
+                    final network = _networks[index];
+                    final ssid = network['ssid'] ?? '';
+                    final signal = network['signal'] ?? '0';
+                    final encrypted = network['encrypted']?.toLowerCase() != 'no';
+                    final isSelected = _selectedSsid == ssid;
+
+                    return ListTile(
+                      leading: Icon(
+                        _getSignalIcon(signal),
+                        color: _getSignalColor(signal),
+                      ),
+                      title: Text(
+                        ssid,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${signal.contains('dBm') ? signal : '$signal dBm'} • ${encrypted ? 'Secured' : 'Open'}',
+                      ),
+                      trailing: encrypted ? const Icon(Icons.lock, size: 16) : const Icon(Icons.lock_open, size: 16),
+                      selected: isSelected,
+                      selectedTileColor: Colors.blue.withOpacity(0.1),
+                      onTap: () {
+                        setState(() {
+                          _selectedSsid = ssid;
+                          _selectedIsEncrypted = encrypted;
+                          _passwordController.clear();
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_selectedSsid != null) ...[
+              const Divider(),
+              Text(
+                'Selected: $_selectedSsid',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (_selectedIsEncrypted)
+                TextField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: 'Password',
+                    border: const OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() => _obscurePassword = !_obscurePassword);
+                      },
+                    ),
+                  ),
+                )
+              else
+                const Text(
+                  'This is an open network (no password required)',
+                  style: TextStyle(color: Colors.grey),
+                ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _selectedSsid != null && !_isConfiguring ? _configure : null,
+          child: _isConfiguring
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Connect'),
+        ),
+      ],
     );
   }
 }
