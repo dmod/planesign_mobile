@@ -25,6 +25,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   static const String ipAddressCharUUID = 'fed6ced8-9ef1-4b7e-9f05-07963adde32b';
   static const String rebootCharUUID = '99945678-1234-5678-1234-56789abcdef2';
   static const String uptimeCharUUID = 'a77a6077-7302-486e-9087-853ac5899335';
+  static const String wifiStatusCharUUID = 'f2a3b4c5-6d7e-8f90-a1b2-c3d4e5f6a7b8';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
@@ -397,6 +398,154 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
+  Widget buildWifiStatusCard() {
+    // Format from PlaneSign BLE: "Connected|SSID|signal" or "Disconnected|None|0" or "Error|...|0"
+    String wifiRaw = _characteristicValues[wifiStatusCharUUID] ?? '';
+
+    String status = 'Unknown';
+    String ssid = 'Not Connected';
+    int signalStrength = 0;
+    bool isConnected = false;
+    bool isError = false;
+
+    if (wifiRaw.isNotEmpty) {
+      final parts = wifiRaw.split('|');
+      if (parts.isNotEmpty) {
+        status = parts[0];
+        isConnected = status == 'Connected';
+        isError = status == 'Error';
+
+        if (parts.length > 1) {
+          ssid = parts[1].isNotEmpty ? parts[1] : 'Unknown Network';
+        }
+        if (parts.length > 2) {
+          signalStrength = int.tryParse(parts[2]) ?? 0;
+        }
+      }
+    }
+
+    // Determine icon and color based on connection status and signal strength
+    IconData wifiIcon;
+    Color wifiColor;
+    String signalText;
+
+    if (isError) {
+      wifiIcon = Icons.wifi_off;
+      wifiColor = Colors.orange;
+      signalText = 'Error';
+    } else if (!isConnected) {
+      wifiIcon = Icons.wifi_off;
+      wifiColor = Colors.red;
+      signalText = 'Disconnected';
+    } else if (signalStrength >= 70) {
+      wifiIcon = Icons.wifi;
+      wifiColor = Colors.green;
+      signalText = 'Excellent';
+    } else if (signalStrength >= 50) {
+      wifiIcon = Icons.wifi;
+      wifiColor = Colors.lightGreen;
+      signalText = 'Good';
+    } else if (signalStrength >= 30) {
+      wifiIcon = Icons.wifi_2_bar;
+      wifiColor = Colors.orange;
+      signalText = 'Fair';
+    } else {
+      wifiIcon = Icons.wifi_1_bar;
+      wifiColor = Colors.red;
+      signalText = 'Weak';
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: wifiColor.withOpacity(0.5), width: 2),
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [wifiColor.withOpacity(0.1), wifiColor.withOpacity(0.05)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: wifiColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(wifiIcon, size: 36, color: wifiColor),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Pi WiFi Connection',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isConnected ? ssid : status,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (isConnected) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: LinearProgressIndicator(
+                          value: signalStrength / 100,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: AlwaysStoppedAnimation<Color>(wifiColor),
+                          minHeight: 8,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      '$signalText ($signalStrength%)',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: wifiColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -459,6 +608,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   ),
                 ),
               if (_connectionState == BluetoothConnectionState.connected) ...[
+                buildWifiStatusCard(),
                 buildTemperatureDisplay(),
                 buildHostnameDisplay(),
                 buildOpenBrowserCard(),
