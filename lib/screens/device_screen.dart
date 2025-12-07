@@ -22,6 +22,7 @@ class DeviceScreen extends StatefulWidget {
 class _DeviceScreenState extends State<DeviceScreen> {
   static const String tempCharUUID = 'abbd155c-e9d1-4d9d-ae9e-6871b20880e4';
   static const String hostnameCharUUID = '7e60d076-d3fd-496c-8460-63a0454d94d9';
+  static const String ipAddressCharUUID = 'fed6ced8-9ef1-4b7e-9f05-07963adde32b';
   static const String rebootCharUUID = '99945678-1234-5678-1234-56789abcdef2';
   static const String uptimeCharUUID = 'a77a6077-7302-486e-9087-853ac5899335';
 
@@ -291,13 +292,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Future<void> _openHostInBrowser() async {
-    final raw = _characteristicValues[hostnameCharUUID];
+    final raw = _characteristicValues[ipAddressCharUUID];
     if (raw == null || raw.trim().isEmpty) {
-      Snackbar.show(ABC.c, "Hostname not available", success: false);
+      Snackbar.show(ABC.c, "IP address not available", success: false);
       return;
     }
-    final host = raw.trim();
-    final uri = Uri.tryParse('https://$host');
+    final ipAddress = raw.trim();
+    final uri = Uri.tryParse('https://$ipAddress');
     if (uri == null) {
       Snackbar.show(ABC.c, "Malformed URL", success: false);
       return;
@@ -313,30 +314,26 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildOpenBrowserCard() {
-    final raw = _characteristicValues[hostnameCharUUID];
-    final hasHost = raw != null && raw.trim().isNotEmpty;
-    final displayHost = hasHost ? raw.trim() : '';
+    final raw = _characteristicValues[ipAddressCharUUID];
+    final hasIp = raw != null && raw.trim().isNotEmpty;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: hasHost ? Colors.indigo[50] : Colors.grey[200],
+      color: hasIp ? Colors.indigo[50] : Colors.grey[200],
       child: InkWell(
-        onTap: hasHost ? _openHostInBrowser : null,
+        onTap: hasIp ? _openHostInBrowser : null,
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.open_in_browser, size: 40, color: hasHost ? Colors.indigo : Colors.grey),
+              Icon(Icons.open_in_browser, size: 40, color: hasIp ? Colors.indigo : Colors.grey),
               const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  hasHost ? 'Open https://$displayHost' : 'Hostname unavailable',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: hasHost ? Colors.indigo : Colors.grey,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                'Open Web Console',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: hasIp ? Colors.indigo : Colors.grey,
                 ),
               ),
             ],
