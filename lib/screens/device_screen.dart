@@ -431,20 +431,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   },
                 ),
               ),
-              // Auto-reconnect toggle
-              SwitchListTile(
-                title: const Text('Auto Reconnect'),
-                subtitle: const Text('Automatically reconnect when connection is lost'),
-                value: _autoReconnect,
-                onChanged: (value) {
-                  setState(() {
-                    _autoReconnect = value;
-                    if (!value) {
-                      _reconnectTimer?.cancel();
-                    }
-                  });
-                },
-              ),
+
               // Manual reconnect button (also redundant with pull-to-refresh, but kept)
               if (_connectionState == BluetoothConnectionState.disconnected)
                 Card(
