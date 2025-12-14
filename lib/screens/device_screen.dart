@@ -194,7 +194,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
       // If currently connected (or connecting), attempt a graceful disconnect first
       BluetoothConnectionState currentState = _connectionState;
-      if (currentState == BluetoothConnectionState.connected || currentState == BluetoothConnectionState.connecting) {
+      if (currentState == BluetoothConnectionState.connected) {
         try {
           await widget.device.disconnect(queue: false);
         } catch (_) {
@@ -462,13 +462,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: wifiColor.withOpacity(0.5), width: 2),
+        side: BorderSide(color: wifiColor.withValues(alpha: 0.5), width: 2),
       ),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
-            colors: [wifiColor.withOpacity(0.1), wifiColor.withOpacity(0.05)],
+            colors: [wifiColor.withValues(alpha: 0.1), wifiColor.withValues(alpha: 0.05)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -482,7 +482,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: wifiColor.withOpacity(0.2),
+                      color: wifiColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(wifiIcon, size: 36, color: wifiColor),
@@ -895,7 +895,7 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
                       ),
                       trailing: encrypted ? const Icon(Icons.lock, size: 16) : const Icon(Icons.lock_open, size: 16),
                       selected: isSelected,
-                      selectedTileColor: Colors.blue.withOpacity(0.1),
+                      selectedTileColor: Colors.blue.withValues(alpha: 0.1),
                       onTap: () {
                         setState(() {
                           _selectedSsid = ssid;
