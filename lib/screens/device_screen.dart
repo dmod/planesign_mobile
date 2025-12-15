@@ -74,7 +74,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 try {
                   await characteristic.setNotifyValue(true);
                   characteristic.lastValueStream.listen((value) {
-                    _updateCharacteristicValue(characteristic.uuid.str, value);
+                    _updateCharacteristicValue(characteristic.uuid.str128, value);
                   });
                 } catch (e) {
                   print('Error subscribing to characteristic ${characteristic.uuid}: $e');
@@ -215,7 +215,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildCharacteristicTile(BluetoothCharacteristic c) {
-    String value = _characteristicValues[c.uuid.str] ?? 'No value';
+    String value = _characteristicValues[c.uuid.str128.toLowerCase()] ?? 'No value';
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
@@ -266,6 +266,30 @@ class _DeviceScreenState extends State<DeviceScreen> {
             SizedBox(width: 16),
             Text(
               hostname,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget buildIpAddressDisplay() {
+    String ipAddress = _characteristicValues[ipAddressCharUUID] ?? 'Unknown';
+    return Card(
+      margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.router, size: 40, color: Colors.teal),
+            SizedBox(width: 16),
+            Text(
+              ipAddress,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -704,6 +728,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 buildWifiConfigButton(),
                 buildTemperatureDisplay(),
                 buildHostnameDisplay(),
+                buildIpAddressDisplay(),
                 buildOpenBrowserCard(),
                 buildUptimeDisplay(),
                 buildRebootButton(),
