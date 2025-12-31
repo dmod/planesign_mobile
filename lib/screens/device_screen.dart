@@ -28,6 +28,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   static const String wifiStatusCharUUID = 'f2a3b4c5-6d7e-8f90-a1b2-c3d4e5f6a7b8';
   static const String wifiScanCharUUID = '99945678-1234-5678-1234-56789abcdef3';
   static const String wifiConfigCharUUID = '99945678-1234-5678-1234-56789abcdef4';
+  static const String dockerContainerControlCharUUID = '29352a73-3108-4ecc-9440-57b5a8a5c027';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
@@ -38,6 +39,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 5;
   Timer? _reconnectTimer;
+
+  bool _isDockerBusy = false;
 
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
@@ -149,6 +152,172 @@ class _DeviceScreenState extends State<DeviceScreen> {
         }
       }
     });
+  }
+
+  BluetoothCharacteristic? _findCharacteristicByUuid(String uuid) {
+    final needle = uuid.toLowerCase();
+    for (final service in _services) {
+      for (final characteristic in service.characteristics) {
+        if (characteristic.uuid.str128.toLowerCase() == needle || characteristic.uuid.str.toLowerCase() == needle) {
+          return characteristic;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<void> _refreshDockerStatus() async {
+    try {
+      final ch = _findCharacteristicByUuid(dockerContainerControlCharUUID);
+      if (ch == null) {
+        Snackbar.show(ABC.c, 'Docker status characteristic not found', success: false);
+        return;
+      }
+      final value = await ch.read();
+      _updateCharacteristicValue(ch.uuid.str128, value);
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException('Docker Status Error:', e), success: false);
+    }
+  }
+
+  Future<void> _sendDockerCommand(String command) async {
+    if (_isDockerBusy) return;
+    if (_connectionState != BluetoothConnectionState.connected) return;
+
+    setState(() => _isDockerBusy = true);
+    try {
+      final ch = _findCharacteristicByUuid(dockerContainerControlCharUUID);
+      if (ch == null) {
+        Snackbar.show(ABC.c, 'Docker control characteristic not found', success: false);
+        return;
+      }
+
+      await ch.write(utf8.encode(command));
+      await _refreshDockerStatus();
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException('Docker Command Error:', e), success: false);
+    } finally {
+      if (mounted) setState(() => _isDockerBusy = false);
+    }
+  }
+
+  Widget buildDockerContainerCard() {
+    final statusRaw = (_characteristicValues[dockerContainerControlCharUUID] ?? '').trim();
+    final normalized = statusRaw.toLowerCase();
+
+    final running = normalized.contains('running=true') || normalized.contains('status=running');
+    final hasValue = statusRaw.isNotEmpty;
+
+    Color borderColor;
+    IconData icon;
+    String headline;
+
+    if (!hasValue) {
+      borderColor = Colors.grey;
+      icon = Icons.help_outline;
+      headline = 'Unknown';
+    } else if (normalized.contains('docker not found') ||
+        normalized.contains('status unavailable') ||
+        normalized.startsWith('error:')) {
+      borderColor = Colors.orange;
+      icon = Icons.warning_amber;
+      headline = 'Unavailable';
+    } else if (running) {
+      borderColor = Colors.green;
+      icon = Icons.check_circle;
+      headline = 'Running';
+    } else {
+      borderColor = Colors.red;
+      icon = Icons.cancel;
+      headline = 'Stopped';
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: borderColor.withValues(alpha: 0.6), width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: borderColor, size: 28),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PlaneSignRuntime',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        headline,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Refresh container status',
+                  onPressed: _isDockerBusy ? null : _refreshDockerStatus,
+                  icon: _isDockerBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.refresh),
+                ),
+              ],
+            ),
+            if (hasValue) ...[
+              const SizedBox(height: 12),
+              Text(
+                statusRaw,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[700],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: (_isDockerBusy || running) ? null : () => _sendDockerCommand('start'),
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Start'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: (_isDockerBusy || !running) ? null : () => _sendDockerCommand('stop'),
+                    icon: const Icon(Icons.stop),
+                    label: const Text('Stop'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -724,6 +893,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   ),
                 ),
               if (_connectionState == BluetoothConnectionState.connected) ...[
+                buildDockerContainerCard(),
                 buildWifiStatusCard(),
                 buildWifiConfigButton(),
                 buildTemperatureDisplay(),
