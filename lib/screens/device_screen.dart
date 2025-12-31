@@ -587,9 +587,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
               final parts = line.split('|');
               if (parts.isNotEmpty && parts[0].isNotEmpty) {
                 networks.add({
-                  'ssid': parts[0],
-                  'signal': parts.length > 1 ? parts[1] : '0',
-                  'encrypted': parts.length > 2 ? parts[2] : 'no',
+                  'ssid': parts[0].trim(),
+                  'signal': parts.length > 1 ? parts[1].trim() : '0',
+                  'encrypted': parts.length > 2 ? parts[2].trim() : 'no',
                 });
               }
             }
@@ -765,6 +765,43 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  int _signalQuality(String signalStr) {
+    // Returns a 0..100 quality score for sorting and UI.
+    // Prefer interpreting negative numbers as RSSI dBm.
+    final dbm = _parseSignalDbm(signalStr);
+    if (dbm != null) {
+      // Map dBm range [-100..-30] to [0..100]
+      final clamped = dbm.clamp(-100, -30);
+      final quality = ((clamped + 100) * 100 / 70).round();
+      return quality.clamp(0, 100);
+    }
+
+    final percent = _parseSignalPercent(signalStr);
+    if (percent != null) return percent.clamp(0, 100);
+
+    return 0;
+  }
+
+  int? _parseSignalDbm(String signalStr) {
+    // Accepts formats like "-55", "-55 dBm", "RSSI:-55".
+    final cleaned = signalStr.trim();
+    final match = RegExp(r'-\d{1,3}').firstMatch(cleaned);
+    if (match == null) return null;
+    return int.tryParse(match.group(0)!);
+  }
+
+  int? _parseSignalPercent(String signalStr) {
+    // Accepts formats like "72", "72%".
+    final cleaned = signalStr.trim();
+    // If there's a negative number present, treat it as dBm instead.
+    if (RegExp(r'-\d{1,3}').hasMatch(cleaned)) return null;
+    final match = RegExp(r'\d{1,3}').firstMatch(cleaned);
+    if (match == null) return null;
+    final val = int.tryParse(match.group(0)!);
+    if (val == null) return null;
+    return val;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -784,6 +821,15 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
     });
 
     final networks = await widget.onScan();
+
+    // Sort strongest signal first
+    networks.sort((a, b) {
+      final qa = _signalQuality(a['signal'] ?? '');
+      final qb = _signalQuality(b['signal'] ?? '');
+      final bySignal = qb.compareTo(qa);
+      if (bySignal != 0) return bySignal;
+      return (a['ssid'] ?? '').compareTo(b['ssid'] ?? '');
+    });
 
     if (mounted) {
       setState(() {
@@ -826,32 +872,35 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
   }
 
   IconData _getSignalIcon(String signalStr) {
-    final signal = int.tryParse(signalStr.replaceAll(RegExp(r'[^0-9-]'), '')) ?? -100;
-    // Signal is typically in dBm (negative) or percentage
-    if (signal > 0) {
-      // Percentage
-      if (signal >= 70) return Icons.wifi;
-      if (signal >= 40) return Icons.wifi_2_bar;
-      return Icons.wifi_1_bar;
-    } else {
-      // dBm
-      if (signal >= -50) return Icons.wifi;
-      if (signal >= -70) return Icons.wifi_2_bar;
-      return Icons.wifi_1_bar;
+    final dbm = _parseSignalDbm(signalStr);
+    if (dbm != null) {
+      if (dbm >= -60) return Icons.wifi;
+      if (dbm >= -75) return Icons.wifi_2_bar;
+      if (dbm >= -90) return Icons.wifi_1_bar;
+      return Icons.wifi_off;
     }
+
+    final percent = _parseSignalPercent(signalStr) ?? 0;
+    if (percent >= 70) return Icons.wifi;
+    if (percent >= 40) return Icons.wifi_2_bar;
+    if (percent >= 15) return Icons.wifi_1_bar;
+    return Icons.wifi_off;
   }
 
   Color _getSignalColor(String signalStr) {
-    final signal = int.tryParse(signalStr.replaceAll(RegExp(r'[^0-9-]'), '')) ?? -100;
-    if (signal > 0) {
-      if (signal >= 70) return Colors.green;
-      if (signal >= 40) return Colors.orange;
-      return Colors.red;
-    } else {
-      if (signal >= -50) return Colors.green;
-      if (signal >= -70) return Colors.orange;
+    // Natural colors based on RSSI dBm: green (strong), amber (medium), red (weak)
+    final dbm = _parseSignalDbm(signalStr);
+    if (dbm != null) {
+      if (dbm >= -60) return Colors.green;
+      if (dbm >= -75) return Colors.amber;
       return Colors.red;
     }
+
+    // Fallback for percentage-based values
+    final percent = _parseSignalPercent(signalStr) ?? 0;
+    if (percent >= 70) return Colors.green;
+    if (percent >= 40) return Colors.amber;
+    return Colors.red;
   }
 
   @override
