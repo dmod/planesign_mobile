@@ -29,6 +29,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 def hasReleaseKeystore = keystorePropertiesFile.exists() && keystoreProperties['storeFile']
+def isReleaseBuild = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
 
 android {
     namespace "com.dmod.planesign_mobile"
@@ -70,6 +71,11 @@ android {
         release {
             if (hasReleaseKeystore) {
                 signingConfig signingConfigs.release
+            } else if (isReleaseBuild) {
+                throw new GradleException(
+                        "Release signing isn't configured. Create android/key.properties and point it at your upload keystore (.jks). " +
+                        "Then rebuild with: flutter build appbundle --release"
+                )
             }
         }
     }

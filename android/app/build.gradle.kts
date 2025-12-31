@@ -5,6 +5,15 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val keystoreProperties = java.util.Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+}
+
+val hasReleaseKeystore = keystorePropertiesFile.exists() && (keystoreProperties["storeFile"] as String?)?.isNotBlank() == true
+val isReleaseBuild = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+
 android {
     namespace = "com.dmod.planesign_mobile"
     compileSdk = flutter.compileSdkVersion
@@ -32,9 +41,19 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            if (hasReleaseKeystore) {
+                signingConfig = signingConfigs.create("release") {
+                    keyAlias = keystoreProperties["keyAlias"] as String
+                    keyPassword = keystoreProperties["keyPassword"] as String
+                    storeFile = file(keystoreProperties["storeFile"] as String)
+                    storePassword = keystoreProperties["storePassword"] as String
+                }
+            } else if (isReleaseBuild) {
+                throw GradleException(
+                    "Release signing isn't configured. Create android/key.properties and point it at your upload keystore (.jks). " +
+                        "Then rebuild with: flutter build appbundle --release"
+                )
+            }
         }
     }
 }
