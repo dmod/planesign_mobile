@@ -29,6 +29,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   static const String wifiScanCharUUID = '99945678-1234-5678-1234-56789abcdef3';
   static const String wifiConfigCharUUID = '99945678-1234-5678-1234-56789abcdef4';
   static const String dockerContainerControlCharUUID = '29352a73-3108-4ecc-9440-57b5a8a5c027';
+  static const String planeSignVersionCharUUID = '8d1151e7-04b8-49e2-955a-daa50e1285e5';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
@@ -205,6 +206,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
     final statusRaw = (_characteristicValues[dockerContainerControlCharUUID] ?? '').trim();
     final normalized = statusRaw.toLowerCase();
 
+    final versionRaw = (_characteristicValues[planeSignVersionCharUUID] ?? '').trim();
+    final versionDisplay = versionRaw.isEmpty ? 'Unknown' : versionRaw;
+
     final running = normalized.contains('running=true') || normalized.contains('status=running');
     final hasValue = statusRaw.isNotEmpty;
 
@@ -294,6 +298,19 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Version: $versionDisplay',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
             const SizedBox(height: 12),
             Row(
               children: [
