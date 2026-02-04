@@ -810,20 +810,20 @@ class _DeviceScreenState extends State<DeviceScreen> {
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Column(
             children: [
               Row(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: wifiColor.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(wifiIcon, size: 36, color: wifiColor),
+                    child: Icon(wifiIcon, size: 32, color: wifiColor),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -831,16 +831,16 @@ class _DeviceScreenState extends State<DeviceScreen> {
                         Text(
                           'Pi WiFi Connection',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           isConnected ? ssid : status,
                           style: const TextStyle(
-                            fontSize: 20,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -848,35 +848,45 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _showWifiConfigDialog,
+                    icon: Icon(Icons.wifi_find, size: 18, color: wifiColor),
+                    label: const Text('Configure'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      side: BorderSide(color: wifiColor.withValues(alpha: 0.8)),
+                      foregroundColor: wifiColor,
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
                 ],
               ),
-              if (isConnected) ...[
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LinearProgressIndicator(
-                          value: signalStrength / 100,
-                          backgroundColor: Colors.grey[300],
-                          valueColor: AlwaysStoppedAnimation<Color>(wifiColor),
-                          minHeight: 8,
-                        ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: LinearProgressIndicator(
+                        value: (signalStrength.clamp(0, 100)) / 100,
+                        backgroundColor: Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation<Color>(wifiColor),
+                        minHeight: 8,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(
-                      '$signalText ($signalStrength%)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: wifiColor,
-                      ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    isConnected ? '$signalText ($signalStrength%)' : 'Not connected',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: isConnected ? wifiColor : Colors.grey[700],
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -1038,7 +1048,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
               if (_connectionState == BluetoothConnectionState.connected) ...[
                 buildDockerContainerCard(),
                 buildWifiStatusCard(),
-                buildWifiConfigButton(),
                 buildInfoCard(),
                 buildOpenBrowserCard(),
                 buildRebootButton(),
