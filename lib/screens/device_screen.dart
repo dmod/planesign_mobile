@@ -487,6 +487,100 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
   }
 
+  Widget buildInfoCard() {
+    final tempValue = _characteristicValues[tempCharUUID] ?? 'No reading';
+    final hostname = _characteristicValues[hostnameCharUUID] ?? 'Unknown';
+    final ipAddress = _characteristicValues[ipAddressCharUUID] ?? 'Unknown';
+    final uptimeRaw = _characteristicValues[uptimeCharUUID] ?? 'No reading';
+    final uptimeDisplay = extractUptimeFromOutput(uptimeRaw);
+
+    Widget row({required IconData icon, required Color color, required String label, required String value}) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: color),
+            const SizedBox(width: 10),
+            SizedBox(
+              width: 90,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.grey[700],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.info_outline, size: 22),
+                const SizedBox(width: 8),
+                const Text(
+                  'Info',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            row(
+              icon: Icons.thermostat,
+              color: Colors.blue,
+              label: 'Temp',
+              value: tempValue,
+            ),
+            row(
+              icon: Icons.computer,
+              color: Colors.green,
+              label: 'Hostname',
+              value: hostname,
+            ),
+            row(
+              icon: Icons.router,
+              color: Colors.teal,
+              label: 'IP Address',
+              value: ipAddress,
+            ),
+            row(
+              icon: Icons.access_time,
+              color: Colors.purple,
+              label: 'Uptime',
+              value: uptimeDisplay,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _rebootDevice() async {
     try {
       for (var service in _services) {
@@ -501,6 +595,38 @@ class _DeviceScreenState extends State<DeviceScreen> {
       Snackbar.show(ABC.c, "Reboot characteristic not found", success: false);
     } catch (e) {
       Snackbar.show(ABC.c, prettyException("Reboot Error:", e), success: false);
+    }
+  }
+
+  Future<void> _confirmAndRebootDevice() async {
+    if (_connectionState != BluetoothConnectionState.connected) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Reboot device?'),
+        content: const Text(
+          'This will restart the PlaneSign device. You may need to reconnect after it comes back online.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Reboot'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _rebootDevice();
     }
   }
 
@@ -561,7 +687,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: Colors.red[100],
       child: InkWell(
-        onTap: _connectionState == BluetoothConnectionState.connected ? _rebootDevice : null,
+        onTap: _connectionState == BluetoothConnectionState.connected ? _confirmAndRebootDevice : null,
         child: Padding(
           padding: EdgeInsets.all(16),
           child: Row(
@@ -913,11 +1039,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 buildDockerContainerCard(),
                 buildWifiStatusCard(),
                 buildWifiConfigButton(),
-                buildTemperatureDisplay(),
-                buildHostnameDisplay(),
-                buildIpAddressDisplay(),
+                buildInfoCard(),
                 buildOpenBrowserCard(),
-                buildUptimeDisplay(),
                 buildRebootButton(),
               ],
               const SizedBox(height: 32), // Ensure scroll area even if few widgets

@@ -295,7 +295,7 @@ class _ScanScreenState extends State<ScanScreen> {
       key: Snackbar.snackBarKeyB,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Find Planesign Device'),
+          title: const Text('Find Plane Sign Device'),
         ),
         body: RefreshIndicator(
           onRefresh: onRefresh,
