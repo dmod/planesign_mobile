@@ -2,16 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSBluetoothAlwaysUsageDescription</key>
-    <string>This app always needs Bluetooth to function</string>
-    <key>NSBluetoothPeripheralUsageDescription</key>
-    <string>This app needs Bluetooth Peripheral to function</string>
-    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>This app always needs location and when in use to function</string>
-    <key>NSLocationAlwaysUsageDescription</key>
-    <string>This app always needs location to function</string>
-    <key>NSLocationWhenInUseUsageDescription</key>
-    <string>This app needs location when in use to function</string>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -34,6 +26,14 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>This app always needs Bluetooth to function</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>This app needs Bluetooth Peripheral to function</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app always needs location to function</string>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -51,9 +51,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
 </dict>
 </plist>
