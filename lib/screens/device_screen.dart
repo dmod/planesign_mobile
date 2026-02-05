@@ -9,6 +9,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../utils/snackbar.dart';
 import '../utils/extra.dart';
 import '../utils/utils.dart';
+import '../utils/ble_utils.dart';
+import '../utils/docker_status.dart';
+import '../utils/wifi_signal.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
@@ -116,10 +119,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   void _updateCharacteristicValue(String uuid, List<int> value) {
     final key = uuid.toLowerCase();
 
-    String decoded = utf8.decode(value, allowMalformed: true);
-
-    // Remove any trailing NULLs and trim whitespace
-    decoded = decoded.replaceAll('\x00', '').trim();
+    final decoded = decodeBleUtf8String(value);
 
     debugPrint('[BLE] Update $key (${value.length} bytes) raw=$value utf8="$decoded"');
 
@@ -155,21 +155,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
     });
   }
 
-  BluetoothCharacteristic? _findCharacteristicByUuid(String uuid) {
-    final needle = uuid.toLowerCase();
-    for (final service in _services) {
-      for (final characteristic in service.characteristics) {
-        if (characteristic.uuid.str128.toLowerCase() == needle || characteristic.uuid.str.toLowerCase() == needle) {
-          return characteristic;
-        }
-      }
-    }
-    return null;
-  }
-
   Future<void> _refreshDockerStatus() async {
     try {
-      final ch = _findCharacteristicByUuid(dockerContainerControlCharUUID);
+      final ch = findCharacteristicByUuid(_services, dockerContainerControlCharUUID);
       if (ch == null) {
         Snackbar.show(ABC.c, 'Docker status characteristic not found', success: false);
         return;
@@ -187,7 +175,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     setState(() => _isDockerBusy = true);
     try {
-      final ch = _findCharacteristicByUuid(dockerContainerControlCharUUID);
+      final ch = findCharacteristicByUuid(_services, dockerContainerControlCharUUID);
       if (ch == null) {
         Snackbar.show(ABC.c, 'Docker control characteristic not found', success: false);
         return;
@@ -204,37 +192,17 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Widget buildDockerContainerCard() {
     final statusRaw = (_characteristicValues[dockerContainerControlCharUUID] ?? '').trim();
-    final normalized = statusRaw.toLowerCase();
 
     final versionRaw = (_characteristicValues[planeSignVersionCharUUID] ?? '').trim();
     final versionDisplay = versionRaw.isEmpty ? 'Unknown' : versionRaw;
 
-    final running = normalized.contains('running=true') || normalized.contains('status=running');
-    final hasValue = statusRaw.isNotEmpty;
+    final dockerDisplay = dockerRuntimeDisplayFromRaw(statusRaw);
 
-    Color borderColor;
-    IconData icon;
-    String headline;
-
-    if (!hasValue) {
-      borderColor = Colors.grey;
-      icon = Icons.help_outline;
-      headline = 'Unknown';
-    } else if (normalized.contains('docker not found') ||
-        normalized.contains('status unavailable') ||
-        normalized.startsWith('error:')) {
-      borderColor = Colors.orange;
-      icon = Icons.warning_amber;
-      headline = 'Unavailable';
-    } else if (running) {
-      borderColor = Colors.green;
-      icon = Icons.check_circle;
-      headline = 'Running';
-    } else {
-      borderColor = Colors.red;
-      icon = Icons.cancel;
-      headline = 'Stopped';
-    }
+    final running = dockerDisplay.running;
+    final hasValue = dockerDisplay.hasValue;
+    final borderColor = dockerDisplay.borderColor;
+    final icon = dockerDisplay.icon;
+    final headline = dockerDisplay.headline;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -737,61 +705,16 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildWifiStatusCard() {
-    // Format from PlaneSign BLE: "Connected|SSID|signal" or "Disconnected|None|0" or "Error|...|0"
-    String wifiRaw = _characteristicValues[wifiStatusCharUUID] ?? '';
+    final wifiRaw = _characteristicValues[wifiStatusCharUUID] ?? '';
+    final wifiDisplay = wifiStatusDisplayFromRaw(wifiRaw);
 
-    String status = 'Unknown';
-    String ssid = 'Not Connected';
-    int signalStrength = 0;
-    bool isConnected = false;
-    bool isError = false;
-
-    if (wifiRaw.isNotEmpty) {
-      final parts = wifiRaw.split('|');
-      if (parts.isNotEmpty) {
-        status = parts[0];
-        isConnected = status == 'Connected';
-        isError = status == 'Error';
-
-        if (parts.length > 1) {
-          ssid = parts[1].isNotEmpty ? parts[1] : 'Unknown Network';
-        }
-        if (parts.length > 2) {
-          signalStrength = int.tryParse(parts[2]) ?? 0;
-        }
-      }
-    }
-
-    // Determine icon and color based on connection status and signal strength
-    IconData wifiIcon;
-    Color wifiColor;
-    String signalText;
-
-    if (isError) {
-      wifiIcon = Icons.wifi_off;
-      wifiColor = Colors.orange;
-      signalText = 'Error';
-    } else if (!isConnected) {
-      wifiIcon = Icons.wifi_off;
-      wifiColor = Colors.red;
-      signalText = 'Disconnected';
-    } else if (signalStrength >= 70) {
-      wifiIcon = Icons.wifi;
-      wifiColor = Colors.green;
-      signalText = 'Excellent';
-    } else if (signalStrength >= 50) {
-      wifiIcon = Icons.wifi;
-      wifiColor = Colors.lightGreen;
-      signalText = 'Good';
-    } else if (signalStrength >= 30) {
-      wifiIcon = Icons.wifi_2_bar;
-      wifiColor = Colors.orange;
-      signalText = 'Fair';
-    } else {
-      wifiIcon = Icons.wifi_1_bar;
-      wifiColor = Colors.red;
-      signalText = 'Weak';
-    }
+    final status = wifiDisplay.status;
+    final ssid = wifiDisplay.ssid;
+    final signalStrength = wifiDisplay.signalStrength;
+    final isConnected = wifiDisplay.isConnected;
+    final wifiIcon = wifiDisplay.icon;
+    final wifiColor = wifiDisplay.color;
+    final signalText = wifiDisplay.signalText;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1149,43 +1072,6 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
-  int _signalQuality(String signalStr) {
-    // Returns a 0..100 quality score for sorting and UI.
-    // Prefer interpreting negative numbers as RSSI dBm.
-    final dbm = _parseSignalDbm(signalStr);
-    if (dbm != null) {
-      // Map dBm range [-100..-30] to [0..100]
-      final clamped = dbm.clamp(-100, -30);
-      final quality = ((clamped + 100) * 100 / 70).round();
-      return quality.clamp(0, 100);
-    }
-
-    final percent = _parseSignalPercent(signalStr);
-    if (percent != null) return percent.clamp(0, 100);
-
-    return 0;
-  }
-
-  int? _parseSignalDbm(String signalStr) {
-    // Accepts formats like "-55", "-55 dBm", "RSSI:-55".
-    final cleaned = signalStr.trim();
-    final match = RegExp(r'-\d{1,3}').firstMatch(cleaned);
-    if (match == null) return null;
-    return int.tryParse(match.group(0)!);
-  }
-
-  int? _parseSignalPercent(String signalStr) {
-    // Accepts formats like "72", "72%".
-    final cleaned = signalStr.trim();
-    // If there's a negative number present, treat it as dBm instead.
-    if (RegExp(r'-\d{1,3}').hasMatch(cleaned)) return null;
-    final match = RegExp(r'\d{1,3}').firstMatch(cleaned);
-    if (match == null) return null;
-    final val = int.tryParse(match.group(0)!);
-    if (val == null) return null;
-    return val;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -1208,8 +1094,8 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
 
     // Sort strongest signal first
     networks.sort((a, b) {
-      final qa = _signalQuality(a['signal'] ?? '');
-      final qb = _signalQuality(b['signal'] ?? '');
+      final qa = signalQuality(a['signal'] ?? '');
+      final qb = signalQuality(b['signal'] ?? '');
       final bySignal = qb.compareTo(qa);
       if (bySignal != 0) return bySignal;
       return (a['ssid'] ?? '').compareTo(b['ssid'] ?? '');
@@ -1256,35 +1142,11 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
   }
 
   IconData _getSignalIcon(String signalStr) {
-    final dbm = _parseSignalDbm(signalStr);
-    if (dbm != null) {
-      if (dbm >= -60) return Icons.wifi;
-      if (dbm >= -75) return Icons.wifi_2_bar;
-      if (dbm >= -90) return Icons.wifi_1_bar;
-      return Icons.wifi_off;
-    }
-
-    final percent = _parseSignalPercent(signalStr) ?? 0;
-    if (percent >= 70) return Icons.wifi;
-    if (percent >= 40) return Icons.wifi_2_bar;
-    if (percent >= 15) return Icons.wifi_1_bar;
-    return Icons.wifi_off;
+    return wifiSignalIcon(signalStr);
   }
 
   Color _getSignalColor(String signalStr) {
-    // Natural colors based on RSSI dBm: green (strong), amber (medium), red (weak)
-    final dbm = _parseSignalDbm(signalStr);
-    if (dbm != null) {
-      if (dbm >= -60) return Colors.green;
-      if (dbm >= -75) return Colors.amber;
-      return Colors.red;
-    }
-
-    // Fallback for percentage-based values
-    final percent = _parseSignalPercent(signalStr) ?? 0;
-    if (percent >= 70) return Colors.green;
-    if (percent >= 40) return Colors.amber;
-    return Colors.red;
+    return wifiSignalColor(signalStr);
   }
 
   @override
