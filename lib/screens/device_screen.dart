@@ -898,7 +898,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
     try {
       for (var service in _services) {
         for (var characteristic in service.characteristics) {
-          if (characteristic.uuid.str.toLowerCase() == wifiScanCharUUID.toLowerCase()) {
+          if (characteristic.uuid.str128.toLowerCase() == wifiScanCharUUID.toLowerCase() ||
+              characteristic.uuid.str.toLowerCase() == wifiScanCharUUID.toLowerCase()) {
             final value = await characteristic.read();
             final decoded = utf8.decode(value, allowMalformed: true).trim();
 
@@ -928,17 +929,81 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
   Future<bool> _configureWifi(String ssid, String password) async {
     try {
+      BluetoothCharacteristic? wifiCh;
       for (var service in _services) {
         for (var characteristic in service.characteristics) {
-          if (characteristic.uuid.str.toLowerCase() == wifiConfigCharUUID.toLowerCase()) {
-            // Format: "SSID|PASSWORD" or "SSID|" for open networks
-            final credentials = '$ssid|$password';
-            await characteristic.write(utf8.encode(credentials));
-            return true;
+          if (characteristic.uuid.str128.toLowerCase() == wifiConfigCharUUID.toLowerCase() ||
+              characteristic.uuid.str.toLowerCase() == wifiConfigCharUUID.toLowerCase()) {
+            wifiCh = characteristic;
+            break;
           }
         }
+        if (wifiCh != null) break;
       }
-      return false;
+
+      if (wifiCh == null) return false;
+
+      final canWrite = wifiCh.properties.write;
+      final canWriteNoResp = wifiCh.properties.writeWithoutResponse;
+      if (!canWrite && !canWriteNoResp) {
+        debugPrint('[WiFi] Config characteristic not writable: ${wifiCh.uuid}');
+        return false;
+      }
+
+      // Format: "SSID|PASSWORD" or "SSID|" for open networks
+      final credentials = '$ssid|$password';
+      final bytes = utf8.encode(credentials);
+
+      bool looksLikeGattUnlikely(Object e) {
+        final s = e.toString();
+        return s.contains('GATT_UNLIKELY') || s.contains('android-code: 14') || s.contains('androidCode: 14');
+      }
+
+      Future<void> doWrite(bool withoutResponse) async {
+        debugPrint(
+          '[WiFi] Writing config to ${wifiCh!.uuid} (ssid="$ssid", bytes=${bytes.length}, withoutResponse=$withoutResponse)',
+        );
+        await wifiCh.write(
+          bytes,
+          withoutResponse: withoutResponse,
+          allowLongWrite: true,
+        );
+      }
+
+      // Prefer writeWithoutResponse when available; some peripherals reject write-with-response.
+      final preferredWithoutResponse = canWriteNoResp;
+      final modesToTry = <bool>[];
+      if (preferredWithoutResponse) {
+        modesToTry.add(true);
+        if (canWrite) modesToTry.add(false);
+      } else {
+        modesToTry.add(false);
+        if (canWriteNoResp) modesToTry.add(true);
+      }
+
+      for (final mode in modesToTry) {
+        try {
+          await doWrite(mode);
+          return true;
+        } catch (e) {
+          debugPrint('[WiFi] Write failed (withoutResponse=$mode): $e');
+          if (looksLikeGattUnlikely(e)) {
+            await Future.delayed(const Duration(milliseconds: 250));
+            continue;
+          }
+          return false;
+        }
+      }
+
+      // Final retry on preferred mode (common transient on Android)
+      try {
+        await Future.delayed(const Duration(milliseconds: 500));
+        await doWrite(preferredWithoutResponse);
+        return true;
+      } catch (e) {
+        debugPrint('[WiFi] Final retry failed: $e');
+        return false;
+      }
     } catch (e) {
       print('Error configuring WiFi: $e');
       return false;
