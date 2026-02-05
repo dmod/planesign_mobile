@@ -12,6 +12,7 @@ import '../utils/utils.dart';
 import '../utils/ble_utils.dart';
 import '../utils/docker_status.dart';
 import '../utils/wifi_signal.dart';
+import '../utils/temperature.dart';
 
 class DeviceScreen extends StatefulWidget {
   final BluetoothDevice device;
@@ -384,7 +385,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildTemperatureDisplay() {
-    String tempValue = _characteristicValues[tempCharUUID] ?? 'No reading';
+    final tempRaw = _characteristicValues[tempCharUUID] ?? 'No reading';
+    final tempDisplay = formatRpiTemperature(tempRaw);
     return Card(
       margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Padding(
@@ -395,7 +397,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
             Icon(Icons.thermostat, size: 40, color: Colors.blue),
             SizedBox(width: 16),
             Text(
-              tempValue,
+              tempDisplay,
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -456,7 +458,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   }
 
   Widget buildInfoCard() {
-    final tempValue = _characteristicValues[tempCharUUID] ?? 'No reading';
+    final tempRaw = _characteristicValues[tempCharUUID] ?? 'No reading';
+    final tempValue = formatRpiTemperature(tempRaw);
     final hostname = _characteristicValues[hostnameCharUUID] ?? 'Unknown';
     final ipAddress = _characteristicValues[ipAddressCharUUID] ?? 'Unknown';
     final uptimeRaw = _characteristicValues[uptimeCharUUID] ?? 'No reading';
