@@ -55,3 +55,85 @@ DockerRuntimeDisplay dockerRuntimeDisplayFromRaw(String statusRaw) {
     headline: headline,
   );
 }
+
+class UpdateCheckDisplay {
+  final bool updateAvailable;
+  final bool checkFailed;
+  final String headline;
+  final String localDigest;
+  final String remoteDigest;
+  final Color borderColor;
+  final IconData icon;
+
+  const UpdateCheckDisplay({
+    required this.updateAvailable,
+    required this.checkFailed,
+    required this.headline,
+    required this.localDigest,
+    required this.remoteDigest,
+    required this.borderColor,
+    required this.icon,
+  });
+}
+
+UpdateCheckDisplay updateCheckDisplayFromRaw(String raw) {
+  final trimmed = raw.trim();
+  final normalized = trimmed.toLowerCase();
+
+  if (trimmed.isEmpty) {
+    return const UpdateCheckDisplay(
+      updateAvailable: false,
+      checkFailed: false,
+      headline: 'Not checked',
+      localDigest: '',
+      remoteDigest: '',
+      borderColor: Colors.grey,
+      icon: Icons.help_outline,
+    );
+  }
+
+  // Parse pipe-delimited fields: "status|local=xxx|remote=yyy"
+  String localDigest = '';
+  String remoteDigest = '';
+  final parts = trimmed.split('|');
+  for (final part in parts) {
+    if (part.startsWith('local=')) {
+      localDigest = part.substring(6);
+    } else if (part.startsWith('remote=')) {
+      remoteDigest = part.substring(7);
+    }
+  }
+
+  if (normalized.startsWith('update-available')) {
+    return UpdateCheckDisplay(
+      updateAvailable: true,
+      checkFailed: false,
+      headline: 'Update Available',
+      localDigest: localDigest,
+      remoteDigest: remoteDigest,
+      borderColor: Colors.blue,
+      icon: Icons.system_update,
+    );
+  } else if (normalized.startsWith('up-to-date')) {
+    return UpdateCheckDisplay(
+      updateAvailable: false,
+      checkFailed: false,
+      headline: 'Up to Date',
+      localDigest: localDigest,
+      remoteDigest: remoteDigest,
+      borderColor: Colors.green,
+      icon: Icons.check_circle_outline,
+    );
+  } else {
+    // "check failed: ..." or unexpected format
+    return UpdateCheckDisplay(
+      updateAvailable: false,
+      checkFailed: true,
+      headline: trimmed,
+      localDigest: localDigest,
+      remoteDigest: remoteDigest,
+      borderColor: Colors.orange,
+      icon: Icons.warning_amber,
+    );
+  }
+}

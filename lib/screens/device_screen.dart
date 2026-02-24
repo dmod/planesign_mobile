@@ -34,6 +34,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   static const String wifiConfigCharUUID = '99945678-1234-5678-1234-56789abcdef4';
   static const String dockerContainerControlCharUUID = '29352a73-3108-4ecc-9440-57b5a8a5c027';
   static const String planeSignVersionCharUUID = '8d1151e7-04b8-49e2-955a-daa50e1285e5';
+  static const String dockerUpdateCheckCharUUID = 'a9cc9f79-aa76-4955-aeb5-85aa9299028e';
+  static const String systemUpdateCharUUID = '32d1b76b-9532-44da-9a43-3b682b8be90c';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
@@ -46,6 +48,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
   Timer? _reconnectTimer;
 
   bool _isDockerBusy = false;
+  bool _isUpdateCheckBusy = false;
+  bool _isUpdating = false;
 
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
@@ -170,6 +174,26 @@ class _DeviceScreenState extends State<DeviceScreen> {
     }
   }
 
+  Future<void> _checkForUpdate() async {
+    if (_isUpdateCheckBusy) return;
+    if (_connectionState != BluetoothConnectionState.connected) return;
+
+    setState(() => _isUpdateCheckBusy = true);
+    try {
+      final ch = findCharacteristicByUuid(_services, dockerUpdateCheckCharUUID);
+      if (ch == null) {
+        Snackbar.show(ABC.c, 'Update check characteristic not found', success: false);
+        return;
+      }
+      final value = await ch.read();
+      _updateCharacteristicValue(ch.uuid.str128, value);
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException('Update Check Error:', e), success: false);
+    } finally {
+      if (mounted) setState(() => _isUpdateCheckBusy = false);
+    }
+  }
+
   Future<void> _sendDockerCommand(String command) async {
     if (_isDockerBusy) return;
     if (_connectionState != BluetoothConnectionState.connected) return;
@@ -191,6 +215,44 @@ class _DeviceScreenState extends State<DeviceScreen> {
     }
   }
 
+  Future<void> _triggerSystemUpdate() async {
+    if (_isUpdating) return;
+    if (_connectionState != BluetoothConnectionState.connected) return;
+
+    // Confirmation dialog — the update script will reboot the device
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('System Update'),
+        content: const Text(
+          'This will download the latest software and reboot the device. '
+          'The connection will be lost during the update.\n\n'
+          'Continue?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Update')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isUpdating = true);
+    try {
+      final ch = findCharacteristicByUuid(_services, systemUpdateCharUUID);
+      if (ch == null) {
+        Snackbar.show(ABC.c, 'Update characteristic not found', success: false);
+        return;
+      }
+      await ch.write(utf8.encode('update'));
+      Snackbar.show(ABC.c, 'Update started — device will reboot when complete', success: true);
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException('Update Error:', e), success: false);
+    } finally {
+      if (mounted) setState(() => _isUpdating = false);
+    }
+  }
+
   Widget buildDockerContainerCard() {
     final statusRaw = (_characteristicValues[dockerContainerControlCharUUID] ?? '').trim();
 
@@ -204,6 +266,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
     final borderColor = dockerDisplay.borderColor;
     final icon = dockerDisplay.icon;
     final headline = dockerDisplay.headline;
+
+    // Update check
+    final updateRaw = (_characteristicValues[dockerUpdateCheckCharUUID] ?? '').trim();
+    final updateDisplay = updateCheckDisplayFromRaw(updateRaw);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -280,6 +346,44 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 maxLines: 2,
               ),
             ),
+            const SizedBox(height: 8),
+            // Update check section
+            Row(
+              children: [
+                Icon(updateDisplay.icon, color: updateDisplay.borderColor, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    updateDisplay.headline,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: updateDisplay.borderColor,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _isUpdateCheckBusy ? null : _checkForUpdate,
+                  icon: _isUpdateCheckBusy
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.search, size: 18),
+                  label: const Text('Check', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+            ),
+            if (updateDisplay.localDigest.isNotEmpty || updateDisplay.remoteDigest.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(left: 28),
+                child: Text(
+                  'Local: ${updateDisplay.localDigest}  Remote: ${updateDisplay.remoteDigest}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
@@ -299,6 +403,27 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: (_isUpdating || _isDockerBusy) ? null : _triggerSystemUpdate,
+                icon: _isUpdating
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.system_update),
+                label: Text(_isUpdating ? 'Updating…' : 'Update'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.indigo.withValues(alpha: 0.15),
+                  foregroundColor: Colors.indigo,
+                  disabledBackgroundColor: Colors.indigo.withValues(alpha: 0.12),
+                  disabledForegroundColor: Colors.indigo.withValues(alpha: 0.4),
+                ),
+              ),
             ),
           ],
         ),
