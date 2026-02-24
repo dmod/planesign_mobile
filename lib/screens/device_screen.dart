@@ -36,6 +36,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   static const String planeSignVersionCharUUID = '8d1151e7-04b8-49e2-955a-daa50e1285e5';
   static const String dockerUpdateCheckCharUUID = 'a9cc9f79-aa76-4955-aeb5-85aa9299028e';
   static const String systemUpdateCharUUID = '32d1b76b-9532-44da-9a43-3b682b8be90c';
+  static const String systemUpdateLogCharUUID = 'f63b67f9-b823-4f8f-a528-94e286cda73e';
 
   BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
   List<BluetoothService> _services = [];
@@ -50,6 +51,10 @@ class _DeviceScreenState extends State<DeviceScreen> {
   bool _isDockerBusy = false;
   bool _isUpdateCheckBusy = false;
   bool _isUpdating = false;
+  bool _showUpdateLog = false;
+
+  String _updateLog = '';
+  final ScrollController _updateLogScrollController = ScrollController();
 
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
@@ -130,8 +135,30 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     if (mounted) {
       setState(() {
-        _characteristicValues[key] = decoded;
+        if (key == systemUpdateLogCharUUID) {
+          _updateLog += decoded;
+        } else {
+          _characteristicValues[key] = decoded;
+          // Auto-detect update completion via status notification
+          if (key == systemUpdateCharUUID && _isUpdating) {
+            if (decoded.startsWith('complete') || decoded.startsWith('failed') || decoded == 'idle') {
+              _isUpdating = false;
+            }
+          }
+        }
       });
+      // Auto-scroll log view to bottom
+      if (key == systemUpdateLogCharUUID && _updateLogScrollController.hasClients) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_updateLogScrollController.hasClients) {
+            _updateLogScrollController.animateTo(
+              _updateLogScrollController.position.maxScrollExtent,
+              duration: const Duration(milliseconds: 100),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
     }
   }
 
@@ -237,19 +264,23 @@ class _DeviceScreenState extends State<DeviceScreen> {
     );
     if (confirmed != true) return;
 
-    setState(() => _isUpdating = true);
+    setState(() {
+      _isUpdating = true;
+      _showUpdateLog = true;
+      _updateLog = '';
+    });
     try {
       final ch = findCharacteristicByUuid(_services, systemUpdateCharUUID);
       if (ch == null) {
         Snackbar.show(ABC.c, 'Update characteristic not found', success: false);
+        setState(() => _isUpdating = false);
         return;
       }
       await ch.write(utf8.encode('update'));
-      Snackbar.show(ABC.c, 'Update started — device will reboot when complete', success: true);
+      Snackbar.show(ABC.c, 'Update started', success: true);
     } catch (e) {
       Snackbar.show(ABC.c, prettyException('Update Error:', e), success: false);
-    } finally {
-      if (mounted) setState(() => _isUpdating = false);
+      setState(() => _isUpdating = false);
     }
   }
 
@@ -323,16 +354,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 ),
               ],
             ),
-            if (hasValue) ...[
-              const SizedBox(height: 12),
-              Text(
-                statusRaw,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[700],
-                ),
-              ),
-            ],
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerLeft,
@@ -373,6 +394,24 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       : const Icon(Icons.search, size: 18),
                   label: const Text('Check', style: TextStyle(fontSize: 12)),
                 ),
+                const SizedBox(width: 4),
+                TextButton.icon(
+                  onPressed: (_isUpdating || _isDockerBusy) ? null : _triggerSystemUpdate,
+                  icon: _isUpdating
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.system_update, size: 18),
+                  label: Text(
+                    _isUpdating ? 'Updating…' : 'Update',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.indigo,
+                  ),
+                ),
               ],
             ),
             if (updateDisplay.localDigest.isNotEmpty || updateDisplay.remoteDigest.isNotEmpty) ...[
@@ -404,27 +443,71 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: (_isUpdating || _isDockerBusy) ? null : _triggerSystemUpdate,
-                icon: _isUpdating
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.system_update),
-                label: Text(_isUpdating ? 'Updating…' : 'Update'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.indigo.withValues(alpha: 0.15),
-                  foregroundColor: Colors.indigo,
-                  disabledBackgroundColor: Colors.indigo.withValues(alpha: 0.12),
-                  disabledForegroundColor: Colors.indigo.withValues(alpha: 0.4),
+            if (_showUpdateLog) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxHeight: 200),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[800],
+                        border: Border(bottom: BorderSide(color: Colors.grey[700]!, width: 0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.terminal, size: 14, color: Colors.grey[400]),
+                          const SizedBox(width: 6),
+                          Text(
+                            'Update Output',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey[400],
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_updateLog.isNotEmpty && !_isUpdating)
+                            InkWell(
+                              onTap: () => setState(() {
+                                _showUpdateLog = false;
+                                _updateLog = '';
+                              }),
+                              child: Icon(Icons.close, size: 14, color: Colors.grey[500]),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Flexible(
+                      child: SingleChildScrollView(
+                        controller: _updateLogScrollController,
+                        padding: const EdgeInsets.all(8),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: SelectableText(
+                            _updateLog.isEmpty ? 'Waiting for output...' : _updateLog,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              color: Colors.greenAccent,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -436,6 +519,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     _connectionStateSubscription.cancel();
     _isConnectingSubscription.cancel();
     _reconnectTimer?.cancel();
+    _updateLogScrollController.dispose();
     super.dispose();
   }
 
