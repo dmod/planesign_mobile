@@ -3,7 +3,7 @@ description: A mobile app for interacting with a RaspberryPi
 
 publish_to: 'none'
 
-version: 0.0.1+6
+version: 0.2.0+2026022401
 
 environment:
   sdk: ^3.4.0
