@@ -107,8 +107,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         if (_autoReconnect && _reconnectAttempts < _maxReconnectAttempts) {
           _scheduleReconnect();
         } else if (_reconnectAttempts >= _maxReconnectAttempts) {
-          Snackbar.show(ABC.c, "Max reconnection attempts ($_maxReconnectAttempts) reached. Please manually reconnect.",
-              success: false);
+          Snackbar.show(ABC.c, "Max reconnection attempts ($_maxReconnectAttempts) reached. Please manually reconnect.", success: false);
         }
       }
       if (mounted) {
@@ -151,11 +150,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       if (key == systemUpdateLogCharUUID && _updateLogScrollController.hasClients) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_updateLogScrollController.hasClients) {
-            _updateLogScrollController.animateTo(
-              _updateLogScrollController.position.maxScrollExtent,
-              duration: const Duration(milliseconds: 100),
-              curve: Curves.easeOut,
-            );
+            _updateLogScrollController.animateTo(_updateLogScrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 100), curve: Curves.easeOut);
           }
         });
       }
@@ -293,7 +288,6 @@ class _DeviceScreenState extends State<DeviceScreen> {
     final dockerDisplay = dockerRuntimeDisplayFromRaw(statusRaw);
 
     final running = dockerDisplay.running;
-    final hasValue = dockerDisplay.hasValue;
     final borderColor = dockerDisplay.borderColor;
     final icon = dockerDisplay.icon;
     final headline = dockerDisplay.headline;
@@ -324,33 +318,17 @@ class _DeviceScreenState extends State<DeviceScreen> {
                     children: [
                       Text(
                         'PlaneSignRuntime',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[700],
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey[700], fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        headline,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      Text(headline, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     ],
                   ),
                 ),
                 IconButton(
                   tooltip: 'Refresh container status',
                   onPressed: _isDockerBusy ? null : _refreshDockerStatus,
-                  icon: _isDockerBusy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.refresh),
+                  icon: _isDockerBusy ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.refresh),
                 ),
               ],
             ),
@@ -359,10 +337,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               alignment: Alignment.centerLeft,
               child: Text(
                 'Version: $versionDisplay',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 2,
               ),
@@ -376,70 +351,38 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 Expanded(
                   child: Text(
                     updateDisplay.headline,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: updateDisplay.borderColor,
-                    ),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: updateDisplay.borderColor),
                   ),
                 ),
                 TextButton.icon(
                   onPressed: _isUpdateCheckBusy ? null : _checkForUpdate,
-                  icon: _isUpdateCheckBusy
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.search, size: 18),
+                  icon: _isUpdateCheckBusy ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.search, size: 18),
                   label: const Text('Check', style: TextStyle(fontSize: 12)),
                 ),
                 const SizedBox(width: 4),
                 TextButton.icon(
                   onPressed: (_isUpdating || _isDockerBusy) ? null : _triggerSystemUpdate,
-                  icon: _isUpdating
-                      ? const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.system_update, size: 18),
-                  label: Text(
-                    _isUpdating ? 'Updating…' : 'Update',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.indigo,
-                  ),
+                  icon: _isUpdating ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.system_update, size: 18),
+                  label: Text(_isUpdating ? 'Updating…' : 'Update', style: const TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(foregroundColor: Colors.indigo),
                 ),
               ],
             ),
             if (updateDisplay.localDigest.isNotEmpty || updateDisplay.remoteDigest.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.only(left: 28),
-                child: Text(
-                  'Local: ${updateDisplay.localDigest}  Remote: ${updateDisplay.remoteDigest}',
-                  style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                ),
+                child: Text('Local: ${updateDisplay.localDigest}  Remote: ${updateDisplay.remoteDigest}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
               ),
             ],
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: (_isDockerBusy || running) ? null : () => _sendDockerCommand('start'),
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Start'),
-                  ),
+                  child: ElevatedButton.icon(onPressed: (_isDockerBusy || running) ? null : () => _sendDockerCommand('start'), icon: const Icon(Icons.play_arrow), label: const Text('Start')),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: (_isDockerBusy || !running) ? null : () => _sendDockerCommand('stop'),
-                    icon: const Icon(Icons.stop),
-                    label: const Text('Stop'),
-                  ),
+                  child: ElevatedButton.icon(onPressed: (_isDockerBusy || !running) ? null : () => _sendDockerCommand('stop'), icon: const Icon(Icons.stop), label: const Text('Stop')),
                 ),
               ],
             ),
@@ -448,10 +391,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               Container(
                 width: double.infinity,
                 constraints: const BoxConstraints(maxHeight: 200),
-                decoration: BoxDecoration(
-                  color: Colors.grey[900],
-                  borderRadius: BorderRadius.circular(8),
-                ),
+                decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
                 clipBehavior: Clip.antiAlias,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -468,11 +408,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           const SizedBox(width: 6),
                           Text(
                             'Update Output',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[400],
-                            ),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey[400]),
                           ),
                           const Spacer(),
                           if (_updateLog.isNotEmpty && !_isUpdating)
@@ -494,12 +430,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           width: double.infinity,
                           child: SelectableText(
                             _updateLog.isEmpty ? 'Waiting for output...' : _updateLog,
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 11,
-                              color: Colors.greenAccent,
-                              height: 1.3,
-                            ),
+                            style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.greenAccent, height: 1.3),
                           ),
                         ),
                       ),
@@ -605,13 +536,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           children: [
             Icon(Icons.thermostat, size: 40, color: Colors.blue),
             SizedBox(width: 16),
-            Text(
-              tempDisplay,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(tempDisplay, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -629,13 +554,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           children: [
             Icon(Icons.computer, size: 40, color: Colors.green),
             SizedBox(width: 16),
-            Text(
-              hostname,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(hostname, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -653,13 +572,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           children: [
             Icon(Icons.router, size: 40, color: Colors.teal),
             SizedBox(width: 16),
-            Text(
-              ipAddress,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(ipAddress, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -685,21 +598,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
               width: 90,
               child: Text(
                 label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(fontSize: 13, color: Colors.grey[700], fontWeight: FontWeight.w600),
               ),
             ),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 2,
               ),
@@ -721,40 +627,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
               children: [
                 const Icon(Icons.info_outline, size: 22),
                 const SizedBox(width: 8),
-                const Text(
-                  'Info',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                const Text('Info', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 10),
-            row(
-              icon: Icons.thermostat,
-              color: Colors.blue,
-              label: 'Temp',
-              value: tempValue,
-            ),
-            row(
-              icon: Icons.computer,
-              color: Colors.green,
-              label: 'Hostname',
-              value: hostname,
-            ),
-            row(
-              icon: Icons.router,
-              color: Colors.teal,
-              label: 'IP Address',
-              value: ipAddress,
-            ),
-            row(
-              icon: Icons.access_time,
-              color: Colors.purple,
-              label: 'Uptime',
-              value: uptimeDisplay,
-            ),
+            row(icon: Icons.thermostat, color: Colors.blue, label: 'Temp', value: tempValue),
+            row(icon: Icons.computer, color: Colors.green, label: 'Hostname', value: hostname),
+            row(icon: Icons.router, color: Colors.teal, label: 'IP Address', value: ipAddress),
+            row(icon: Icons.access_time, color: Colors.purple, label: 'Uptime', value: uptimeDisplay),
           ],
         ),
       ),
@@ -785,19 +665,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Reboot device?'),
-        content: const Text(
-          'This will restart the PlaneSign device. You may need to reconnect after it comes back online.',
-        ),
+        content: const Text('This will restart the PlaneSign device. You may need to reconnect after it comes back online.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(context).pop(true),
             child: const Text('Reboot'),
           ),
@@ -849,11 +721,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               const SizedBox(width: 16),
               Text(
                 'Open Web Console',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: hasIp ? Colors.indigo : Colors.grey,
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: hasIp ? Colors.indigo : Colors.grey),
               ),
             ],
           ),
@@ -877,11 +745,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               SizedBox(width: 16),
               Text(
                 'Reboot Device',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.red),
               ),
             ],
           ),
@@ -903,13 +767,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
           children: [
             Icon(Icons.access_time, size: 40, color: Colors.purple),
             SizedBox(width: 16),
-            Text(
-              uptimeDisplay,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            Text(uptimeDisplay, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -938,11 +796,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [wifiColor.withValues(alpha: 0.1), wifiColor.withValues(alpha: 0.05)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          gradient: LinearGradient(colors: [wifiColor.withValues(alpha: 0.1), wifiColor.withValues(alpha: 0.05)], begin: Alignment.topLeft, end: Alignment.bottomRight),
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -952,10 +806,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                 children: [
                   Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: wifiColor.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+                    decoration: BoxDecoration(color: wifiColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(12)),
                     child: Icon(wifiIcon, size: 32, color: wifiColor),
                   ),
                   const SizedBox(width: 12),
@@ -965,19 +816,12 @@ class _DeviceScreenState extends State<DeviceScreen> {
                       children: [
                         Text(
                           'Pi WiFi Connection',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(fontSize: 13, color: Colors.grey[600], fontWeight: FontWeight.w600),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           isConnected ? ssid : status,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
@@ -1014,11 +858,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
                   const SizedBox(width: 12),
                   Text(
                     isConnected ? '$signalText ($signalStrength%)' : 'Not connected',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: isConnected ? wifiColor : Colors.grey[700],
-                    ),
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: isConnected ? wifiColor : Colors.grey[700]),
                   ),
                 ],
               ),
@@ -1033,8 +873,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
     try {
       for (var service in _services) {
         for (var characteristic in service.characteristics) {
-          if (characteristic.uuid.str128.toLowerCase() == wifiScanCharUUID.toLowerCase() ||
-              characteristic.uuid.str.toLowerCase() == wifiScanCharUUID.toLowerCase()) {
+          if (characteristic.uuid.str128.toLowerCase() == wifiScanCharUUID.toLowerCase() || characteristic.uuid.str.toLowerCase() == wifiScanCharUUID.toLowerCase()) {
             final value = await characteristic.read();
             final decoded = utf8.decode(value, allowMalformed: true).trim();
 
@@ -1044,11 +883,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               if (line.trim().isEmpty) continue;
               final parts = line.split('|');
               if (parts.isNotEmpty && parts[0].isNotEmpty) {
-                networks.add({
-                  'ssid': parts[0].trim(),
-                  'signal': parts.length > 1 ? parts[1].trim() : '0',
-                  'encrypted': parts.length > 2 ? parts[2].trim() : 'no',
-                });
+                networks.add({'ssid': parts[0].trim(), 'signal': parts.length > 1 ? parts[1].trim() : '0', 'encrypted': parts.length > 2 ? parts[2].trim() : 'no'});
               }
             }
             return networks;
@@ -1067,8 +902,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
       BluetoothCharacteristic? wifiCh;
       for (var service in _services) {
         for (var characteristic in service.characteristics) {
-          if (characteristic.uuid.str128.toLowerCase() == wifiConfigCharUUID.toLowerCase() ||
-              characteristic.uuid.str.toLowerCase() == wifiConfigCharUUID.toLowerCase()) {
+          if (characteristic.uuid.str128.toLowerCase() == wifiConfigCharUUID.toLowerCase() || characteristic.uuid.str.toLowerCase() == wifiConfigCharUUID.toLowerCase()) {
             wifiCh = characteristic;
             break;
           }
@@ -1095,14 +929,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
       }
 
       Future<void> doWrite(bool withoutResponse) async {
-        debugPrint(
-          '[WiFi] Writing config to ${wifiCh!.uuid} (ssid="$ssid", bytes=${bytes.length}, withoutResponse=$withoutResponse)',
-        );
-        await wifiCh.write(
-          bytes,
-          withoutResponse: withoutResponse,
-          allowLongWrite: true,
-        );
+        debugPrint('[WiFi] Writing config to ${wifiCh!.uuid} (ssid="$ssid", bytes=${bytes.length}, withoutResponse=$withoutResponse)');
+        await wifiCh.write(bytes, withoutResponse: withoutResponse, allowLongWrite: true);
       }
 
       // Prefer writeWithoutResponse when available; some peripherals reject write-with-response.
@@ -1148,10 +976,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   void _showWifiConfigDialog() {
     showDialog(
       context: context,
-      builder: (context) => _WifiConfigDialog(
-        onScan: _scanWifiNetworks,
-        onConfigure: _configureWifi,
-      ),
+      builder: (context) => _WifiConfigDialog(onScan: _scanWifiNetworks, onConfigure: _configureWifi),
     );
   }
 
@@ -1171,11 +996,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
               const SizedBox(width: 16),
               Text(
                 'Configure WiFi',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue[700],
-                ),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue[700]),
               ),
             ],
           ),
@@ -1187,9 +1008,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.device.platformName),
-      ),
+      appBar: AppBar(title: Text(widget.device.platformName)),
       body: RefreshIndicator(
         key: _refreshKey,
         color: Theme.of(context).colorScheme.primary,
@@ -1199,13 +1018,8 @@ class _DeviceScreenState extends State<DeviceScreen> {
           child: Column(
             children: <Widget>[
               ListTile(
-                title: Text(
-                  'Status: ${_connectionState.toString().split('.')[1]}',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: _reconnectAttempts > 0
-                    ? Text('Reconnection attempts: $_reconnectAttempts/$_maxReconnectAttempts')
-                    : null,
+                title: Text('Status: ${_connectionState.toString().split('.')[1]}', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: _reconnectAttempts > 0 ? Text('Reconnection attempts: $_reconnectAttempts/$_maxReconnectAttempts') : null,
                 trailing: IconButton(
                   tooltip: 'Refresh / Reconnect',
                   icon: const Icon(Icons.sync),
@@ -1234,24 +1048,14 @@ class _DeviceScreenState extends State<DeviceScreen> {
                           SizedBox(width: 16),
                           Text(
                             'Reconnect',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
+                            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.blue),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-              if (_connectionState == BluetoothConnectionState.connected) ...[
-                buildDockerContainerCard(),
-                buildWifiStatusCard(),
-                buildInfoCard(),
-                buildOpenBrowserCard(),
-                buildRebootButton(),
-              ],
+              if (_connectionState == BluetoothConnectionState.connected) ...[buildDockerContainerCard(), buildWifiStatusCard(), buildInfoCard(), buildOpenBrowserCard(), buildRebootButton()],
               const SizedBox(height: 32), // Ensure scroll area even if few widgets
             ],
           ),
@@ -1266,10 +1070,7 @@ class _WifiConfigDialog extends StatefulWidget {
   final Future<List<Map<String, String>>> Function() onScan;
   final Future<bool> Function(String ssid, String password) onConfigure;
 
-  const _WifiConfigDialog({
-    required this.onScan,
-    required this.onConfigure,
-  });
+  const _WifiConfigDialog({required this.onScan, required this.onConfigure});
 
   @override
   State<_WifiConfigDialog> createState() => _WifiConfigDialogState();
@@ -1326,29 +1127,16 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
 
     setState(() => _isConfiguring = true);
 
-    final success = await widget.onConfigure(
-      _selectedSsid!,
-      _passwordController.text,
-    );
+    final success = await widget.onConfigure(_selectedSsid!, _passwordController.text);
 
     if (mounted) {
       setState(() => _isConfiguring = false);
 
       if (success) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('WiFi configured: $_selectedSsid'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('WiFi configured: $_selectedSsid'), backgroundColor: Colors.green));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to configure WiFi'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to configure WiFi'), backgroundColor: Colors.red));
       }
     }
   }
@@ -1370,17 +1158,9 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
           const SizedBox(width: 8),
           const Expanded(child: Text('Configure WiFi')),
           if (_isScanning)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
+            const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
           else
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: _startScan,
-              tooltip: 'Rescan',
-            ),
+            IconButton(icon: const Icon(Icons.refresh), onPressed: _startScan, tooltip: 'Rescan'),
         ],
       ),
       content: SizedBox(
@@ -1412,19 +1192,9 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
                     final isSelected = _selectedSsid == ssid;
 
                     return ListTile(
-                      leading: Icon(
-                        _getSignalIcon(signal),
-                        color: _getSignalColor(signal),
-                      ),
-                      title: Text(
-                        ssid,
-                        style: TextStyle(
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      subtitle: Text(
-                        '${signal.contains('dBm') ? signal : '$signal dBm'} • ${encrypted ? 'Secured' : 'Open'}',
-                      ),
+                      leading: Icon(_getSignalIcon(signal), color: _getSignalColor(signal)),
+                      title: Text(ssid, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+                      subtitle: Text('${signal.contains('dBm') ? signal : '$signal dBm'} • ${encrypted ? 'Secured' : 'Open'}'),
                       trailing: encrypted ? const Icon(Icons.lock, size: 16) : const Icon(Icons.lock_open, size: 16),
                       selected: isSelected,
                       selectedTileColor: Colors.blue.withValues(alpha: 0.1),
@@ -1441,10 +1211,7 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
               ),
             if (_selectedSsid != null) ...[
               const Divider(),
-              Text(
-                'Selected: $_selectedSsid',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
+              Text('Selected: $_selectedSsid', style: const TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               if (_selectedIsEncrypted)
                 TextField(
@@ -1454,9 +1221,7 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
                     labelText: 'Password',
                     border: const OutlineInputBorder(),
                     suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                      ),
+                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                       onPressed: () {
                         setState(() => _obscurePassword = !_obscurePassword);
                       },
@@ -1464,28 +1229,16 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
                   ),
                 )
               else
-                const Text(
-                  'This is an open network (no password required)',
-                  style: TextStyle(color: Colors.grey),
-                ),
+                const Text('This is an open network (no password required)', style: TextStyle(color: Colors.grey)),
             ],
           ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
         ElevatedButton(
           onPressed: _selectedSsid != null && !_isConfiguring ? _configure : null,
-          child: _isConfiguring
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Connect'),
+          child: _isConfiguring ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Connect'),
         ),
       ],
     );
