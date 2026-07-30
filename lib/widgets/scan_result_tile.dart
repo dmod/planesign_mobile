@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class ScanResultTile extends StatefulWidget {
-  const ScanResultTile({super.key, required this.result, this.onTap});
+  const ScanResultTile({super.key, required this.result, this.onTap, this.onIdentify, this.isIdentifying = false});
 
   final ScanResult result;
   final VoidCallback? onTap;
+  final VoidCallback? onIdentify;
+  final bool isIdentifying;
 
   @override
   State<ScanResultTile> createState() => _ScanResultTileState();
@@ -91,6 +93,22 @@ class _ScanResultTileState extends State<ScanResultTile> {
     );
   }
 
+  Widget _buildIdentifyButton(BuildContext context) {
+    return TextButton.icon(
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      onPressed: (widget.result.advertisementData.connectable && !widget.isIdentifying) ? widget.onIdentify : null,
+      icon: widget.isIdentifying
+          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.lightbulb_outline, size: 18),
+      label: const Text('Identify'),
+    );
+  }
+
   Widget _buildAdvRow(BuildContext context, String title, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
@@ -119,7 +137,13 @@ class _ScanResultTileState extends State<ScanResultTile> {
     return ExpansionTile(
       title: _buildTitle(context),
       leading: Text(widget.result.rssi.toString()),
-      trailing: _buildConnectButton(context),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (widget.onIdentify != null) _buildIdentifyButton(context),
+          _buildConnectButton(context),
+        ],
+      ),
       children: <Widget>[
         if (adv.advName.isNotEmpty) _buildAdvRow(context, 'Name', adv.advName),
         if (adv.txPowerLevel != null) _buildAdvRow(context, 'Tx Power Level', '${adv.txPowerLevel}'),

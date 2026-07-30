@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import 'device_screen.dart';
+import '../utils/ble_utils.dart';
 import '../utils/snackbar.dart';
 import '../widgets/system_device_tile.dart';
 import '../widgets/scan_result_tile.dart';
@@ -127,9 +129,11 @@ class ScanScreen extends StatefulWidget {
 
 class _ScanScreenState extends State<ScanScreen> {
   static const String planesignMasterUUID = '3d951a35-76c5-4207-a150-2d0cf7d2bfdd';
+  static const String identifyCharUUID = 'e64fcf70-97d7-4f4e-a5b7-8ac6004f0786';
 
   List<BluetoothDevice> _systemDevices = [];
   List<ScanResult> _scanResults = [];
+  final Set<DeviceIdentifier> _identifyingDevices = {};
   bool _isScanning = false;
   late StreamSubscription<List<ScanResult>> _scanResultsSubscription;
   late StreamSubscription<bool> _isScanningSubscription;
@@ -236,6 +240,52 @@ class _ScanScreenState extends State<ScanScreen> {
     Navigator.of(context).push(route);
   }
 
+  /// Briefly connects to a sign and asks it to flash its matrix, so the user can
+  /// tell which physical sign a scan result belongs to.
+  Future<void> onIdentifyPressed(BluetoothDevice device) async {
+    if (_identifyingDevices.contains(device.remoteId)) {
+      return;
+    }
+
+    setState(() => _identifyingDevices.add(device.remoteId));
+
+    bool didConnect = false;
+    try {
+      // Scanning while connecting is unreliable, so pause it for the round trip.
+      if (FlutterBluePlus.isScanningNow) {
+        await FlutterBluePlus.stopScan();
+      }
+
+      if (device.isDisconnected) {
+        await device.connectAndUpdateStream();
+        didConnect = true;
+      }
+
+      final services = await device.discoverServices();
+      final ch = findCharacteristicByUuid(services, identifyCharUUID);
+      if (ch == null) {
+        Snackbar.show(ABC.b, 'Identify is not supported by this device', success: false);
+        return;
+      }
+
+      await ch.write(utf8.encode('identify'));
+      Snackbar.show(ABC.b, 'Look for the flashing sign', success: true);
+    } catch (e) {
+      Snackbar.show(ABC.b, prettyException("Identify Error:", e), success: false);
+    } finally {
+      if (didConnect) {
+        try {
+          await device.disconnectAndUpdateStream();
+        } catch (e) {
+          print(e);
+        }
+      }
+      if (mounted) {
+        setState(() => _identifyingDevices.remove(device.remoteId));
+      }
+    }
+  }
+
   Future onRefresh() {
     if (_isScanning == false) {
       FlutterBluePlus.startScan(timeout: const Duration(seconds: 15));
@@ -284,6 +334,8 @@ class _ScanScreenState extends State<ScanScreen> {
           (r) => ScanResultTile(
             result: r,
             onTap: () => onConnectPressed(r.device),
+            onIdentify: () => onIdentifyPressed(r.device),
+            isIdentifying: _identifyingDevices.contains(r.device.remoteId),
           ),
         )
         .toList();
