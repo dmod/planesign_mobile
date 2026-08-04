@@ -34,7 +34,7 @@ extension Extra on BluetoothDevice {
     _cstream.add(true);
     try {
       await connect(
-        license: License.free,
+        license: License.nonprofit,
         mtu: null,
         timeout: Duration(seconds: 15), // 15 second timeout
         autoConnect: false, // Disable auto-connect for better control

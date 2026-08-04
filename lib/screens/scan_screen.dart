@@ -25,10 +25,7 @@ class _RadarScanAnimationState extends State<RadarScanAnimation> with SingleTick
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    )..repeat();
+    _controller = AnimationController(duration: const Duration(seconds: 2), vsync: this)..repeat();
   }
 
   @override
@@ -74,10 +71,7 @@ class _RadarScanAnimationState extends State<RadarScanAnimation> with SingleTick
             builder: (context, child) {
               return Transform.rotate(
                 angle: _controller.value * 2 * math.pi,
-                child: CustomPaint(
-                  size: const Size(200, 200),
-                  painter: RadarPainter(),
-                ),
+                child: CustomPaint(size: const Size(200, 200), painter: RadarPainter()),
               );
             },
           ),
@@ -92,28 +86,13 @@ class RadarPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
       ..shader = SweepGradient(
-        colors: [
-          Colors.blue.withValues(alpha: 0.0),
-          Colors.blue.withValues(alpha: 0.5),
-        ],
+        colors: [Colors.blue.withValues(alpha: 0.0), Colors.blue.withValues(alpha: 0.5)],
         stops: const [0.0, 1.0],
         startAngle: 0,
         endAngle: math.pi / 2,
-      ).createShader(Rect.fromCircle(
-        center: Offset(size.width / 2, size.height / 2),
-        radius: size.width / 2,
-      ));
+      ).createShader(Rect.fromCircle(center: Offset(size.width / 2, size.height / 2), radius: size.width / 2));
 
-    canvas.drawArc(
-      Rect.fromCircle(
-        center: Offset(size.width / 2, size.height / 2),
-        radius: size.width / 2,
-      ),
-      0,
-      math.pi / 2,
-      true,
-      paint,
-    );
+    canvas.drawArc(Rect.fromCircle(center: Offset(size.width / 2, size.height / 2), radius: size.width / 2), 0, math.pi / 2, true, paint);
   }
 
   @override
@@ -142,20 +121,19 @@ class _ScanScreenState extends State<ScanScreen> {
   void initState() {
     super.initState();
 
-    _scanResultsSubscription = FlutterBluePlus.scanResults.listen((results) {
-      // Filter results to only show devices advertising our target service UUID
-      _scanResults = results
-          .where((r) => r.advertisementData.serviceUuids
-              .map((e) => e.str.toLowerCase())
-              .contains(planesignMasterUUID.toLowerCase()))
-          .toList();
+    _scanResultsSubscription = FlutterBluePlus.scanResults.listen(
+      (results) {
+        // Filter results to only show devices advertising our target service UUID
+        _scanResults = results.where((r) => r.advertisementData.serviceUuids.map((e) => e.str.toLowerCase()).contains(planesignMasterUUID.toLowerCase())).toList();
 
-      if (mounted) {
-        setState(() {});
-      }
-    }, onError: (e) {
-      Snackbar.show(ABC.b, prettyException("Scan Error:", e), success: false);
-    });
+        if (mounted) {
+          setState(() {});
+        }
+      },
+      onError: (e) {
+        Snackbar.show(ABC.b, prettyException("Scan Error:", e), success: false);
+      },
+    );
 
     _isScanningSubscription = FlutterBluePlus.isScanning.listen((state) {
       _isScanning = state;
@@ -195,24 +173,7 @@ class _ScanScreenState extends State<ScanScreen> {
       _scanResults = [];
       setState(() {});
 
-      await FlutterBluePlus.startScan(
-          withServices: [Guid(planesignMasterUUID)],
-          timeout: const Duration(seconds: 15),
-          androidUsesFineLocation: false);
-
-      // Add artificial delay before showing results
-      FlutterBluePlus.scanResults.listen((results) async {
-        await Future.delayed(const Duration(seconds: 3));
-        if (mounted) {
-          setState(() {
-            _scanResults = results
-                .where((r) => r.advertisementData.serviceUuids
-                    .map((e) => e.str.toLowerCase())
-                    .contains(planesignMasterUUID.toLowerCase()))
-                .toList();
-          });
-        }
-      });
+      await FlutterBluePlus.startScan(withServices: [Guid(planesignMasterUUID)], timeout: const Duration(seconds: 15), androidUsesFineLocation: false);
     } catch (e) {
       Snackbar.show(ABC.b, prettyException("Start Scan Error:", e), success: false);
       print(e);
@@ -236,7 +197,9 @@ class _ScanScreenState extends State<ScanScreen> {
       Snackbar.show(ABC.c, prettyException("Connect Error:", e), success: false);
     });
     MaterialPageRoute route = MaterialPageRoute(
-        builder: (context) => DeviceScreen(device: device), settings: RouteSettings(name: '/DeviceScreen'));
+      builder: (context) => DeviceScreen(device: device),
+      settings: RouteSettings(name: '/DeviceScreen'),
+    );
     Navigator.of(context).push(route);
   }
 
@@ -298,16 +261,9 @@ class _ScanScreenState extends State<ScanScreen> {
 
   Widget buildScanButton(BuildContext context) {
     if (FlutterBluePlus.isScanningNow) {
-      return FloatingActionButton(
-        onPressed: onStopPressed,
-        backgroundColor: Colors.red,
-        child: const Icon(Icons.stop),
-      );
+      return FloatingActionButton(onPressed: onStopPressed, backgroundColor: Colors.red, child: const Icon(Icons.stop));
     } else {
-      return FloatingActionButton(
-        onPressed: onScanPressed,
-        child: const Text("SCAN"),
-      );
+      return FloatingActionButton(onPressed: onScanPressed, child: const Text("SCAN"));
     }
   }
 
@@ -330,14 +286,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
   List<Widget> _buildScanResultTiles(BuildContext context) {
     return _scanResults
-        .map(
-          (r) => ScanResultTile(
-            result: r,
-            onTap: () => onConnectPressed(r.device),
-            onIdentify: () => onIdentifyPressed(r.device),
-            isIdentifying: _identifyingDevices.contains(r.device.remoteId),
-          ),
-        )
+        .map((r) => ScanResultTile(result: r, onTap: () => onConnectPressed(r.device), onIdentify: () => onIdentifyPressed(r.device), isIdentifying: _identifyingDevices.contains(r.device.remoteId)))
         .toList();
   }
 
@@ -346,9 +295,7 @@ class _ScanScreenState extends State<ScanScreen> {
     return ScaffoldMessenger(
       key: Snackbar.snackBarKeyB,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Find Plane Sign Device'),
-        ),
+        appBar: AppBar(title: const Text('Find Plane Sign Device')),
         body: RefreshIndicator(
           onRefresh: onRefresh,
           child: ListView(
@@ -367,9 +314,7 @@ class _ScanScreenState extends State<ScanScreen> {
                     if (_isScanning)
                       Container(
                         padding: EdgeInsets.symmetric(vertical: 20),
-                        child: const Center(
-                          child: RadarScanAnimation(),
-                        ),
+                        child: const Center(child: RadarScanAnimation()),
                       ),
                   ],
                 ),
