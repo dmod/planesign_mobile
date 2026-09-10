@@ -59,6 +59,9 @@ class _DeviceScreenState extends State<DeviceScreen> {
   late StreamSubscription<BluetoothConnectionState> _connectionStateSubscription;
   late StreamSubscription<bool> _isConnectingSubscription;
 
+  // Re-subscribed on every reconnect, so the previous set has to be cancelled first.
+  final List<StreamSubscription<List<int>>> _valueSubscriptions = [];
+
   // Key for programmatic control of refresh indicator (optional future use)
   final GlobalKey<RefreshIndicatorState> _refreshKey = GlobalKey<RefreshIndicatorState>();
 
@@ -76,6 +79,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
         _services = []; // must rediscover services
         try {
           _services = await widget.device.discoverServices();
+          await _cancelValueSubscriptions();
           // Automatically read and subscribe to all characteristics
           for (var service in _services) {
             for (var characteristic in service.characteristics) {
@@ -90,9 +94,11 @@ class _DeviceScreenState extends State<DeviceScreen> {
               if (characteristic.properties.notify || characteristic.properties.indicate) {
                 try {
                   await characteristic.setNotifyValue(true);
-                  characteristic.lastValueStream.listen((value) {
-                    _updateCharacteristicValue(characteristic.uuid.str128, value);
-                  });
+                  _valueSubscriptions.add(
+                    characteristic.lastValueStream.listen((value) {
+                      _updateCharacteristicValue(characteristic.uuid.str128, value);
+                    }),
+                  );
                 } catch (e) {
                   print('Error subscribing to characteristic ${characteristic.uuid}: $e');
                 }
@@ -123,6 +129,13 @@ class _DeviceScreenState extends State<DeviceScreen> {
 
     // Auto-connect when screen opens
     onConnectPressed();
+  }
+
+  Future<void> _cancelValueSubscriptions() async {
+    for (final subscription in _valueSubscriptions) {
+      await subscription.cancel();
+    }
+    _valueSubscriptions.clear();
   }
 
   void _updateCharacteristicValue(String uuid, List<int> value) {
@@ -449,6 +462,7 @@ class _DeviceScreenState extends State<DeviceScreen> {
   void dispose() {
     _connectionStateSubscription.cancel();
     _isConnectingSubscription.cancel();
+    _cancelValueSubscriptions();
     _reconnectTimer?.cancel();
     _updateLogScrollController.dispose();
     super.dispose();
@@ -1133,10 +1147,12 @@ class _WifiConfigDialogState extends State<_WifiConfigDialog> {
       setState(() => _isConfiguring = false);
 
       if (success) {
+        // The peripheral acknowledges the write and then joins in the background, so this
+        // only confirms delivery. The Wi-Fi status card reports the actual result.
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('WiFi configured: $_selectedSsid'), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connecting to $_selectedSsid… check the WiFi status card'), backgroundColor: Colors.blue));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to configure WiFi'), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to send WiFi credentials'), backgroundColor: Colors.red));
       }
     }
   }
