@@ -14,6 +14,8 @@ Requires the Flutter SDK version pinned in `pubspec.yaml` (`flutter: 3.32.4`, Da
 - Run: `flutter run`
 - Build Android bundle: `flutter build appbundle`
 - Regenerate launcher icons after changing `assets/icon/icon.png`: `dart run flutter_launcher_icons`
+- Regenerate splash/launch images after changing `assets/icon/icon.png`: `dart run flutter_native_splash:create`
+  (`flutter_launcher_icons` only writes app icons; launch images are owned by `flutter_native_splash`)
 
 There is currently no `test/` directory. If you add tests, run the whole suite with
 `flutter test` and a single file/test with `flutter test test/foo_test.dart --plain-name "test name"`.
